@@ -36,9 +36,9 @@ const api = {
 let D = { parts: [], revisions: [], ncrs: [], captures: [], boards: [] }, lastJson = '', loaded = false;
 let sel = null, tab = 'revs', q = '', showAll = false, faiRev = null, form = null;
 
-async function refresh() {
+async function refresh(quiet) { // quiet: background poll, skip redraw when nothing changed
   const txt = await (await fetch('/api/data')).text();
-  if (txt === lastJson && loaded) return;
+  if (quiet && txt === lastJson && loaded) return;
   lastJson = txt; D = Object.assign({ boards: [] }, JSON.parse(txt)); loaded = true; render();
 }
 
@@ -855,5 +855,5 @@ fetch('/api/info').then(r => r.json()).then(i => {
 const fail = err => { const b = $('#banner'); b.hidden = false; b.textContent = 'Can’t reach the local app (' + ((err && err.message) || 'error') + '). Check that app.py is still running, then reload.'; };
 refresh().catch(fail);
 // Picks up captures sent from the Fusion add-in, and edits from another tab.
-setInterval(() => { if (document.visibilityState === 'visible' && $('#ov').hidden) refresh().catch(() => {}); }, 4000);
+setInterval(() => { if (document.visibilityState === 'visible' && $('#ov').hidden) refresh(true).catch(() => {}); }, 4000);
 })();
