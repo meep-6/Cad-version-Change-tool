@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>CAD Change Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: drafting-office tool. Parts index on the left, a drawing "title block" header per part, revision cards down the right. */
+:root{
+  --paper:#EEF1F0; --sheet:#FFFFFF; --sheet-2:#F6F8F7; --ink:#182024; --muted:#5A676C; --line:#D2D9D8;
+  --accent:#0B6A6F; --accent-ink:#FFFFFF; --accent-soft:#DAECEB;
+  --ok:#256F45; --ok-bg:#DFF0E5; --warn:#8C5A00; --warn-bg:#FAEDD2; --danger:#B0261E; --danger-bg:#FBE4E2;
+  --up:#256F45; --down:#B0261E;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#101517; --sheet:#182023; --sheet-2:#1D262A; --ink:#E2E8E9; --muted:#93A1A5; --line:#2C373B;
+  --accent:#55B7B8; --accent-ink:#0B1A1B; --accent-soft:#16302F;
+  --ok:#73C795; --ok-bg:#16301F; --warn:#E3B35A; --warn-bg:#33280F; --danger:#F08A82; --danger-bg:#3A1A18;
+  --up:#73C795; --down:#F08A82; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#101517; --sheet:#182023; --sheet-2:#1D262A; --ink:#E2E8E9; --muted:#93A1A5; --line:#2C373B;
+  --accent:#55B7B8; --accent-ink:#0B1A1B; --accent-soft:#16302F;
+  --ok:#73C795; --ok-bg:#16301F; --warn:#E3B35A; --warn-bg:#33280F; --danger:#F08A82; --danger-bg:#3A1A18;
+  --up:#73C795; --down:#F08A82; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--sheet)}
+.brand{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.02em;text-transform:uppercase;margin:0}
+.brand small{font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted);letter-spacing:.06em;margin-left:8px;text-transform:none}
+.top .sp{flex:1}
+.banner{margin:12px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));padding:10px 12px;border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:6px}
+
+.shell{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:calc(100vh - 64px)}
+.side{border-right:1px solid var(--line);background:var(--sheet-2);padding:14px 12px 14px max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px}
+.main{min-width:0;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.main-in{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--sheet);padding:7px 12px;border-radius:6px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger)}
+.btn.danger.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn[disabled]{opacity:.55;cursor:default}
+.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font-weight:500}
+
+.search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--sheet)}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.pitem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;padding:9px 10px;border-radius:6px;cursor:pointer;border:1px solid transparent;text-align:left;width:100%;background:none}
+.pitem:hover{background:var(--sheet)}
+.pitem.on{background:var(--sheet);border-color:var(--accent)}
+.pitem .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pitem .pn{grid-column:1;font-family:var(--f-mono);font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pitem .rv{grid-row:1/3;grid-column:2;align-self:center}
+.side-h{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.08em;font-size:13px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.hint{color:var(--muted);font-size:13px}
+
+/* rev mark: boxed letter, like a drawing revision block */
+.rev{display:inline-grid;place-items:center;min-width:30px;height:26px;padding:0 6px;border:1.5px solid var(--ink);font-family:var(--f-mono);font-weight:500;font-size:13px;border-radius:2px;background:var(--sheet)}
+.rev.big{min-width:44px;height:38px;font-size:18px}
+.pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+.pill.Draft{background:var(--warn-bg);color:var(--warn)}
+.pill.Review{background:var(--accent-soft);color:var(--accent)}
+.pill.Released{background:var(--ok-bg);color:var(--ok)}
+.chip{font-family:var(--f-mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+
+/* title block */
+.tblock{background:var(--sheet);border:1.5px solid var(--ink);border-radius:2px}
+.tb-head{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--ink)}
+.tb-head h2{font-family:var(--f-display);font-size:30px;line-height:1.05;font-weight:600;margin:0;text-wrap:balance}
+.tb-head .t{flex:1;min-width:200px}
+.tb-head .acts{display:flex;gap:6px;flex-wrap:wrap}
+.tb-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
+.cell{padding:8px 12px;border-right:1px solid var(--line);min-width:0}
+.cell:last-child{border-right:0}
+.cell .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.cell .v{font-family:var(--f-mono);font-size:13px;overflow-wrap:anywhere}
+.tb-notes{padding:10px 16px;border-top:1px solid var(--line);color:var(--muted);white-space:pre-wrap}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);align-items:flex-end;flex-wrap:wrap}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;cursor:pointer;font-weight:500;color:var(--muted)}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs .sp{flex:1}
+
+/* revision card */
+.rcard{background:var(--sheet);border:1px solid var(--line);border-radius:6px;display:grid;grid-template-columns:58px minmax(0,1fr)}
+.rcard .gut{border-right:1px dashed var(--line);display:flex;justify-content:center;padding-top:14px}
+.rcard .bd{padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.rhead{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.rhead h3{margin:0;font-size:16px;font-weight:600;flex:1 1 220px;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+.lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:2px}
+.prose{white-space:pre-wrap;max-width:70ch}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.d-up{color:var(--up)} .d-down{color:var(--down)}
+.was{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.bom-a{color:var(--ok);font-weight:600} .bom-r{color:var(--danger);font-weight:600} .bom-c{color:var(--warn);font-weight:600}
+.imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.fig{margin:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--sheet-2);cursor:zoom-in}
+.fig img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;max-width:100%}
+.fig figcaption{padding:5px 8px;font-size:12px;display:flex;gap:6px;align-items:baseline}
+.fig .tag{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.racts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+
+.hist td.carry{color:var(--muted)}
+.hist td.chg{background:var(--accent-soft);font-weight:500}
+.hist th.rv{text-align:center}
+
+.empty{background:var(--sheet);border:1.5px dashed var(--line);border-radius:6px;padding:36px 24px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty h2{font-family:var(--f-display);font-size:26px;margin:0;font-weight:600}
+.empty p{margin:0;color:var(--muted);max-width:52ch}
+
+/* overlay sheet */
+.ov{position:fixed;inset:0;background:rgba(10,16,18,.55);z-index:50;display:flex;justify-content:center;align-items:flex-start;overflow:auto;padding:max(24px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 24px max(12px,env(safe-area-inset-left,0px))}
+.panel{background:var(--sheet);border:1px solid var(--line);border-radius:8px;width:100%;max-width:760px;display:flex;flex-direction:column}
+.panel-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.panel-h h2{margin:0;font-family:var(--f-display);font-size:22px;font-weight:600;flex:1}
+.panel-b{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.panel-f{display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.panel-f .err{color:var(--danger);flex:1;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f.s2{grid-column:span 2} .f.s4{grid-column:1/-1}
+.f label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--muted)}
+.f input,.f select,.f textarea,.rowin{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:5px;background:var(--sheet-2);min-width:0}
+.f textarea{min-height:76px;resize:vertical}
+.sec{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:12px}
+.sec-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.sec-h .lbl{margin:0}
+.rows{display:flex;flex-direction:column;gap:6px}
+.prow{display:grid;grid-template-columns:2fr 1fr 1fr 70px 30px;gap:6px}
+.brow{display:grid;grid-template-columns:110px 2fr 60px 1.4fr 30px;gap:6px}
+.irow{display:grid;grid-template-columns:72px 110px minmax(0,1fr) 30px;gap:8px;align-items:center}
+.irow img{width:72px;height:54px;object-fit:cover;border-radius:3px;border:1px solid var(--line)}
+.x{border:1px solid var(--line);background:none;border-radius:5px;cursor:pointer;color:var(--muted)}
+.x:hover{color:var(--danger);border-color:var(--danger)}
+.lb{max-width:min(1100px,100%);display:flex;flex-direction:column;gap:8px;align-items:center;color:#fff}
+.lb img{max-height:80vh;border-radius:4px;background:#fff}
+textarea.out{width:100%;min-height:260px;font-family:var(--f-mono);font-size:12px;padding:10px;border:1px solid var(--line);border-radius:5px;background:var(--sheet-2)}
+.back{display:none}
+
+@media (max-width:760px){
+  .shell{grid-template-columns:1fr}
+  .side{border-right:0;border-bottom:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  body.viewing .side{display:none}
+  body:not(.viewing) .main{display:none}
+  .back{display:inline-flex}
+  .tb-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cell{border-bottom:1px solid var(--line)}
+  .cell:nth-child(2n){border-right:0}
+  .two{grid-template-columns:1fr}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .f.s2{grid-column:1/-1}
+  .prow{grid-template-columns:1fr 1fr 30px}
+  .prow .pn{grid-column:1/3} .prow .pu{grid-column:auto}
+  .brow{grid-template-columns:1fr 1fr 30px}
+  .brow .bi{grid-column:1/3}
+  .rcard{grid-template-columns:1fr}
+  .rcard .gut{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <h1 class="brand">CAD Change Log<small>Fusion 360 · design revisions</small></h1>
+  <span class="sp"></span>
+  <span id="where" class="hint mono" style="max-width:40ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+  <button class="btn primary" id="newPartTop" type="button">+ New part</button>
+</header>
+<div id="banner" class="banner" hidden></div>
+
+<div class="shell">
+  <aside class="side">
+    <input id="q" class="search" type="search" placeholder="Search parts, numbers, projects" aria-label="Search parts">
+    <div class="side-h"><span>Parts</span><span id="pcount" class="mono"></span></div>
+    <ul id="plist" class="plist"></ul>
+  </aside>
+  <main class="main"><div class="main-in" id="view"></div></main>
+</div>
+
+<div id="ov" class="ov" hidden></div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fmtDate=s=>{if(!s)return '—';const d=new Date(s+'T00:00:00');return isNaN(d)?esc(s):d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})};
+const STAT={Draft:'Draft',Review:'In review',Released:'Released'};
+
+let db=null, assets=null, parts=[], revs=[], loaded={p:false,r:false}, sel=null, tab='timeline', q='';
+let form=null; // current form state
+
+/* ---------- data ---------- */
+function partRevs(pid){return revs.filter(r=>r.partId===pid).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))}
+const STOP=new Set(['OF','THE','AND','FOR','A','AN','TO','WITH','IN','ON']);
+function abbr(s,max){
+  const w=String(s||'').trim().split(/\s+/).map(x=>x.replace(/[^A-Za-z0-9]/g,'').toUpperCase()).filter(Boolean);
+  if(!w.length) return '';
+  if(w.length===1) return w[0].slice(0,max);
+  const k=w.filter(x=>!STOP.has(x)); return (k.length?k:w).map(x=>/^\d+$/.test(x)?x:x[0]).join('').slice(0,max);
+}
+function autoPartNo(name,proj,exceptId){
+  const ini=abbr(name,4); if(!ini) return '';
+  const pre=(abbr(proj,5)?abbr(proj,5)+'-':'')+ini+'-';
+  let max=0; parts.forEach(p=>{if(p.id===exceptId||!p.partNo||!p.partNo.toUpperCase().startsWith(pre))return;
+    const m=p.partNo.slice(pre.length).match(/^(\d+)/); if(m) max=Math.max(max,+m[1])});
+  return pre+String(max+1).padStart(3,'0');
+}
+function fillNo(){const n=$('#p-no');if(n&&form&&form.autoNo)n.value=autoPartNo($('#p-name').value,$('#p-proj').value,form.id)}
+function nextRev(last){
+  if(!last) return 'A';
+  if(/^[A-Z]$/.test(last)) return last==='Z'?'AA':String.fromCharCode(last.charCodeAt(0)+1);
+  const m=last.match(/^(.*?)(\d+)$/); if(m) return m[1]+String(+m[2]+1).padStart(m[2].length,'0');
+  return '';
+}
+function delta(o,n){
+  const a=parseFloat(o), b=parseFloat(n);
+  if(o===''||n===''||isNaN(a)||isNaN(b)||!/^\s*-?[\d.]+/.test(o)||!/^\s*-?[\d.]+/.test(n)) return '';
+  const d=+(b-a).toFixed(4); if(d===0) return '<span class="hint">0</span>';
+  const pct=a!==0?` <span class="hint">(${d>0?'+':''}${(d/Math.abs(a)*100).toFixed(1)}%)</span>`:'';
+  return `<span class="${d>0?'d-up':'d-down'}">${d>0?'+':''}${d}</span>${pct}`;
+}
+
+/* ---------- sidebar ---------- */
+function renderList(){
+  const list=$('#plist');
+  const ps=parts.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))
+    .filter(p=>!q||[p.name,p.partNo,p.project,p.material].join(' ').toLowerCase().includes(q));
+  $('#pcount').textContent=parts.length?String(parts.length):'';
+  if(!loaded.p&&db){list.innerHTML='<li class="hint" style="padding:8px">Loading parts…</li>';return}
+  if(!parts.length){list.innerHTML='<li class="hint" style="padding:8px">No parts yet. Add one to start logging revisions.</li>';return}
+  if(!ps.length){list.innerHTML='<li class="hint" style="padding:8px">No parts match “'+esc(q)+'”.</li>';return}
+  list.innerHTML=ps.map(p=>{const rs=partRevs(p.id);const l=rs[rs.length-1];
+    return `<li><button type="button" class="pitem${p.id===sel?' on':''}" data-pid="${esc(p.id)}">
+      <span class="nm">${esc(p.name)}</span>
+      <span class="rv">${l?`<span class="rev">${esc(l.rev)}</span>`:'<span class="hint">—</span>'}</span>
+      <span class="pn">${esc(p.partNo||'No part no.')}${p.project?' · '+esc(p.project):''}</span></button></li>`}).join('');
+}
+
+/* ---------- main view ---------- */
+function render(){
+  renderList();
+  document.body.classList.toggle('viewing',!!sel);
+  const v=$('#view');
+  const p=parts.find(x=>x.id===sel);
+  if(!p){
+    if(sel&&loaded.p) sel=null;
+    v.innerHTML=`<div class="empty">
+      <span class="rev big">A</span>
+      <h2>${parts.length?'Pick a part to see its history':'Start your first part'}</h2>
+      <p>Each part gets a title block and a revision trail: what changed, why, the Fusion 360 version it maps to, parameter deltas, BOM edits and before/after screenshots.</p>
+      ${parts.length?'':'<button class="btn primary" type="button" data-act="new-part">+ New part</button>'}
+    </div>`;
+    return;
+  }
+  const rs=partRevs(p.id), last=rs[rs.length-1];
+  const upd=p.updatedAt?new Date(p.updatedAt).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}):'—';
+  let h=`<div><button class="btn ghost sm back" type="button" data-act="back">← All parts</button></div>
+  <section class="tblock">
+    <div class="tb-head">
+      <span class="rev big">${last?esc(last.rev):'–'}</span>
+      <div class="t"><h2>${esc(p.name)}</h2>
+        <div class="meta">${last?`<span class="pill ${esc(last.status)}">${esc(STAT[last.status]||last.status)}</span>`:''}
+        ${p.fusionUrl?`<a href="${esc(p.fusionUrl)}" target="_blank" rel="noopener">Open in Fusion ↗</a>`:''}</div></div>
+      <div class="acts">
+        <button class="btn primary" type="button" data-act="new-rev">+ New revision</button>
+        <button class="btn" type="button" data-act="edit-part">Edit part</button>
+        <button class="btn" type="button" data-act="export">Copy changelog</button>
+        <button class="btn danger" type="button" data-act="del-part">Delete</button>
+      </div>
+    </div>
+    <div class="tb-grid">
+      ${cell('Part no.',p.partNo)}${cell('Project',p.project)}${cell('Material',p.material)}
+      ${cell('Units',p.units||'mm')}${cell('Revisions',String(rs.length))}${cell('Updated',upd)}
+    </div>
+    ${p.notes?`<div class="tb-notes">${esc(p.notes)}</div>`:''}
+  </section>
+  <nav class="tabs" role="tablist">
+    <button class="tab${tab==='timeline'?' on':''}" type="button" data-tab="timeline">Revision history</button>
+    <button class="tab${tab==='params'?' on':''}" type="button" data-tab="params">Parameter history</button>
+  </nav>`;
+  if(!rs.length){
+    h+=`<div class="empty"><h2>No revisions yet</h2><p>Log the current state as Rev A: the baseline parameters, material and a screenshot from Fusion.</p>
+      <button class="btn primary" type="button" data-act="new-rev">+ Log Rev A</button></div>`;
+  } else if(tab==='params'){
+    h+=paramHistory(rs,p);
+  } else {
+    h+=rs.slice().reverse().map(r=>revCard(r,p)).join('');
+  }
+  v.innerHTML=h;
+}
+const cell=(k,v)=>`<div class="cell"><div class="k">${k}</div><div class="v">${esc(v||'—')}</div></div>`;
+
+function revCard(r,p){
+  const params=(r.params||[]).filter(x=>x.name), bom=(r.bom||[]).filter(x=>x.item), imgs=r.images||[];
+  return `<article class="rcard" id="r-${esc(r.id)}">
+    <div class="gut"><span class="rev">${esc(r.rev)}</span></div>
+    <div class="bd">
+      <div class="rhead"><span class="rev" style="display:none">${esc(r.rev)}</span><h3>${esc(r.title)}</h3><span class="pill ${esc(r.status)}">${esc(STAT[r.status]||r.status)}</span></div>
+      <div class="meta"><span class="mono">${fmtDate(r.date)}</span>${r.fusionVer?`<span class="chip">Fusion ${esc(r.fusionVer)}</span>`:''}<span class="chip">Rev ${esc(r.rev)}</span></div>
+      ${(r.what||r.why)?`<div class="two">
+        <div><div class="lbl">What changed</div><div class="prose">${esc(r.what||'—')}</div></div>
+        <div><div class="lbl">Why</div><div class="prose">${esc(r.why||'—')}</div></div></div>`:''}
+      ${params.length?`<div><div class="lbl">Parameters</div><div class="tw"><table>
+        <thead><tr><th>Parameter</th><th>Was</th><th>Now</th><th>Δ</th></tr></thead><tbody>
+        ${params.map(x=>`<tr><td>${esc(x.name)}</td><td class="num was">${esc(x.old)}${x.old&&x.unit?' '+esc(x.unit):''}</td><td class="num">${esc(x.new)}${x.new&&x.unit?' '+esc(x.unit):''}</td><td class="num">${delta(x.old,x.new)}</td></tr>`).join('')}
+        </tbody></table></div></div>`:''}
+      ${bom.length?`<div><div class="lbl">BOM changes</div><div class="tw"><table>
+        <thead><tr><th>Change</th><th>Item</th><th>Qty</th><th>Material / note</th></tr></thead><tbody>
+        ${bom.map(b=>`<tr><td class="${b.action==='Added'?'bom-a':b.action==='Removed'?'bom-r':'bom-c'}">${esc(b.action)}</td><td>${esc(b.item)}</td><td class="num">${esc(b.qty)}</td><td>${esc(b.note)}</td></tr>`).join('')}
+        </tbody></table></div></div>`:''}
+      ${imgs.length?`<div><div class="lbl">Images</div><div class="imgs">
+        ${imgs.map((im,i)=>`<figure class="fig" data-img="${esc(r.id)}:${i}" tabindex="0"><img src="${esc(im.url)}" alt="${esc(im.caption||im.tag||'Revision image')}" loading="lazy"><figcaption>${im.tag?`<span class="tag">${esc(im.tag)}</span>`:''}<span>${esc(im.caption)}</span></figcaption></figure>`).join('')}
+        </div></div>`:''}
+      <div class="racts"><button class="btn sm" type="button" data-act="edit-rev" data-rid="${esc(r.id)}">Edit</button>
+        <button class="btn sm danger" type="button" data-act="del-rev" data-rid="${esc(r.id)}">Delete</button></div>
+    </div></article>`;
+}
+
+function paramHistory(rs,p){
+  const names=[]; rs.forEach(r=>(r.params||[]).forEach(x=>{if(x.name&&!names.includes(x.name))names.push(x.name)}));
+  if(!names.length) return `<div class="empty"><h2>No parameters logged</h2><p>Add parameter rows (wall thickness, hub bore, blade pitch…) to a revision and they’ll line up here across every rev.</p></div>`;
+  const rows=names.map(n=>{
+    let base='', cur='', unit='';
+    const first=rs.find(r=>(r.params||[]).some(x=>x.name===n)); const fx=first.params.find(x=>x.name===n); base=fx.old||''; unit=fx.unit||'';
+    cur=base;
+    const tds=rs.map(r=>{const x=(r.params||[]).find(y=>y.name===n);
+      if(x){cur=x.new; if(x.unit) unit=x.unit; return `<td class="num chg">${esc(x.new)}</td>`}
+      return `<td class="num carry">${esc(cur)}</td>`}).join('');
+    return `<tr><td>${esc(n)}${unit?` <span class="hint">(${esc(unit)})</span>`:''}</td><td class="num carry">${esc(base||'—')}</td>${tds}</tr>`});
+  return `<div class="tblock" style="border-width:1px;border-color:var(--line)"><div class="tw"><table class="hist">
+    <thead><tr><th>Parameter</th><th>Baseline</th>${rs.map(r=>`<th class="rv"><span class="rev">${esc(r.rev)}</span></th>`).join('')}</tr></thead>
+    <tbody>${rows.join('')}</tbody></table></div></div>
+    <p class="hint" style="margin:0">Shaded cells are values changed in that revision; grey values carry over from earlier revisions.</p>`;
+}
+
+/* ---------- overlay helpers ---------- */
+function openOv(html){const o=$('#ov');o.innerHTML=html;o.hidden=false;const f=o.querySelector('input,textarea,select,button');if(f)f.focus()}
+function closeOv(){const o=$('#ov');o.hidden=true;o.innerHTML='';if(form&&form.imgs)form.imgs.forEach(i=>i.preview&&URL.revokeObjectURL(i.preview));form=null}
+function setErr(m){const e=$('#ov .err');if(e)e.textContent=m||''}
+
+/* ---------- part form ---------- */
+function partForm(p){
+  p=p||{};
+  form={kind:'part',id:p.id||null,autoNo:!p.id||!p.partNo};
+  openOv(`<form class="panel" id="pform" novalidate>
+    <div class="panel-h"><h2>${p.id?'Edit part':'New part'}</h2><button class="btn ghost sm" type="button" data-act="close">Close</button></div>
+    <div class="panel-b"><div class="grid">
+      <div class="f s2"><label for="p-name">Part name</label><input id="p-name" value="${esc(p.name)}" placeholder="Motor mount bracket" required></div>
+      <div class="f"><label for="p-no">Part no. <span id="p-auto" class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">${!p.id||!p.partNo?'· auto':''}</span></label><input id="p-no" class="mono" value="${esc(p.partNo)}" placeholder="Fills from name"><button class="linkbtn" type="button" data-act="regen-no" style="align-self:flex-start;font-size:12px">Regenerate</button></div>
+      <div class="f"><label for="p-units">Units</label><select id="p-units">${['mm','in','m'].map(u=>`<option${(p.units||'mm')===u?' selected':''}>${u}</option>`).join('')}</select></div>
+      <div class="f s2"><label for="p-proj">Project</label><input id="p-proj" value="${esc(p.project)}" placeholder="Project or assembly"></div>
+      <div class="f s2"><label for="p-mat">Material</label><input id="p-mat" value="${esc(p.material)}" placeholder="Al 6061-T6, PETG, CF-nylon…"></div>
+      <div class="f s4"><label for="p-url">Fusion 360 link</label><input id="p-url" value="${esc(p.fusionUrl)}" placeholder="https://a360.co/… or the design's web link" inputmode="url"></div>
+      <div class="f s4"><label for="p-notes">Notes</label><textarea id="p-notes" placeholder="Design intent, constraints, mating parts">${esc(p.notes)}</textarea></div>
+    </div></div>
+    <div class="panel-f"><span class="err"></span><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">${p.id?'Save part':'Create part'}</button></div>
+  </form>`);
+}
+async function savePart(){
+  const name=$('#p-name').value.trim(); if(!name) return setErr('Give the part a name.');
+  if(!db) return setErr('Saving isn’t available in this view.');
+  let url=$('#p-url').value.trim(); if(url&&!/^https?:\/\//i.test(url)) url='https://'+url;
+  const body={name,partNo:$('#p-no').value.trim(),units:$('#p-units').value,project:$('#p-proj').value.trim(),material:$('#p-mat').value.trim(),fusionUrl:url,notes:$('#p-notes').value.trim(),updatedAt:Date.now()};
+  const b=$('#pform button[type=submit]'); b.disabled=true; b.textContent='Saving…';
+  try{
+    if(form.id){await db.doc('parts/'+form.id).update(body)}
+    else{body.createdAt=Date.now(); const ref=await db.collection('parts').add(body); sel=ref.id; tab='timeline'}
+    closeOv(); render();
+  }catch(e){b.disabled=false;b.textContent='Save';setErr('Couldn’t save: '+(e&&e.message||e))}
+}
+
+/* ---------- revision form ---------- */
+function revForm(r){
+  const p=parts.find(x=>x.id===sel); const rs=partRevs(sel); const last=rs[rs.length-1];
+  const editing=!!(r&&r.id);
+  r=r||{rev:nextRev(last&&last.rev),date:today(),status:'Draft',params:[],bom:[],images:[]};
+  form={kind:'rev',id:r.id||null,
+    params:(r.params||[]).map(x=>({...x})),bom:(r.bom||[]).map(x=>({...x})),
+    imgs:(r.images||[]).map(x=>({...x})),removed:[]};
+  if(!form.params.length) form.params.push({name:'',old:'',new:'',unit:p.units||'mm'});
+  openOv(`<form class="panel" id="rform" novalidate>
+    <div class="panel-h"><h2>${editing?'Edit revision '+esc(r.rev):'New revision'} · ${esc(p.name)}</h2><button class="btn ghost sm" type="button" data-act="close">Close</button></div>
+    <div class="panel-b">
+      <div class="grid">
+        <div class="f"><label for="r-rev">Rev</label><input id="r-rev" class="mono" value="${esc(r.rev)}" placeholder="B"></div>
+        <div class="f"><label for="r-date">Date</label><input id="r-date" type="date" value="${esc(r.date)}"></div>
+        <div class="f"><label for="r-fv">Fusion version</label><input id="r-fv" class="mono" value="${esc(r.fusionVer)}" placeholder="v14"></div>
+        <div class="f"><label for="r-st">Status</label><select id="r-st">${Object.keys(STAT).map(k=>`<option value="${k}"${r.status===k?' selected':''}>${STAT[k]}</option>`).join('')}</select></div>
+        <div class="f s4"><label for="r-title">Summary</label><input id="r-title" value="${esc(r.title)}" placeholder="Thickened mounting flange, added M3 heat-set bosses"></div>
+        <div class="f s2"><label for="r-what">What changed</label><textarea id="r-what" placeholder="Features added, removed or modified">${esc(r.what)}</textarea></div>
+        <div class="f s2"><label for="r-why">Why</label><textarea id="r-why" placeholder="Test result, FEA, fit issue, print failure, reviewer note">${esc(r.why)}</textarea></div>
+      </div>
+      <div class="sec"><div class="sec-h"><div class="lbl">Parameters</div><span>
+        ${last&&!editing?'<button class="linkbtn" type="button" data-act="pull-params">Pull from Rev '+esc(last.rev)+'</button> · ':''}
+        <button class="linkbtn" type="button" data-act="add-param">+ Add row</button></span></div>
+        <div class="rows" id="prows"></div></div>
+      <div class="sec"><div class="sec-h"><div class="lbl">BOM changes</div><button class="linkbtn" type="button" data-act="add-bom">+ Add row</button></div>
+        <div class="rows" id="brows"></div></div>
+      <div class="sec"><div class="sec-h"><div class="lbl">Images</div>
+        ${assets?'<label class="linkbtn" for="r-files" style="cursor:pointer">+ Add screenshots</label><input id="r-files" type="file" accept="image/*" multiple hidden>':''}</div>
+        ${assets?'<span class="hint">Paste a screenshot (Ctrl/Cmd+V) or pick files. Tag each as Before / After / Section / Drawing.</span>':'<span class="hint">Image upload isn’t available in this view.</span>'}
+        <div class="rows" id="irows"></div></div>
+    </div>
+    <div class="panel-f"><span class="err"></span><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" type="submit">${editing?'Save revision':'Log revision'}</button></div>
+  </form>`);
+  drawRows();
+}
+function drawRows(){
+  const pr=$('#prows'), br=$('#brows'), ir=$('#irows'); if(!pr) return;
+  pr.innerHTML=form.params.map((x,i)=>`<div class="prow">
+    <input class="rowin pn" data-l="params" data-i="${i}" data-k="name" value="${esc(x.name)}" placeholder="Parameter" aria-label="Parameter name" id="pp-n${i}">
+    <input class="rowin mono" data-l="params" data-i="${i}" data-k="old" value="${esc(x.old)}" placeholder="Was" aria-label="Old value" id="pp-o${i}">
+    <input class="rowin mono" data-l="params" data-i="${i}" data-k="new" value="${esc(x.new)}" placeholder="Now" aria-label="New value" id="pp-w${i}">
+    <input class="rowin mono pu" data-l="params" data-i="${i}" data-k="unit" value="${esc(x.unit)}" placeholder="unit" aria-label="Unit" id="pp-u${i}">
+    <button class="x" type="button" data-act="rm" data-l="params" data-i="${i}" aria-label="Remove row">×</button></div>`).join('')||'<span class="hint">No parameter rows.</span>';
+  br.innerHTML=form.bom.map((x,i)=>`<div class="brow">
+    <select class="rowin" data-l="bom" data-i="${i}" data-k="action" aria-label="Change type" id="bb-a${i}">${['Added','Changed','Removed'].map(a=>`<option${x.action===a?' selected':''}>${a}</option>`).join('')}</select>
+    <input class="rowin bi" data-l="bom" data-i="${i}" data-k="item" value="${esc(x.item)}" placeholder="Item (M3x8 SHCS, bearing 608ZZ…)" aria-label="Item" id="bb-i${i}">
+    <input class="rowin mono" data-l="bom" data-i="${i}" data-k="qty" value="${esc(x.qty)}" placeholder="Qty" aria-label="Quantity" id="bb-q${i}">
+    <input class="rowin" data-l="bom" data-i="${i}" data-k="note" value="${esc(x.note)}" placeholder="Material / note" aria-label="Note" id="bb-n${i}">
+    <button class="x" type="button" data-act="rm" data-l="bom" data-i="${i}" aria-label="Remove row">×</button></div>`).join('')||'<span class="hint">No BOM changes.</span>';
+  ir.innerHTML=form.imgs.map((x,i)=>`<div class="irow">
+    <img src="${esc(x.preview||x.url)}" alt="">
+    <select class="rowin" data-l="imgs" data-i="${i}" data-k="tag" aria-label="Image tag" id="ii-t${i}">${['Before','After','Section','Drawing','Other'].map(a=>`<option${(x.tag||'After')===a?' selected':''}>${a}</option>`).join('')}</select>
+    <input class="rowin" data-l="imgs" data-i="${i}" data-k="caption" value="${esc(x.caption)}" placeholder="Caption" aria-label="Caption" id="ii-c${i}">
+    <button class="x" type="button" data-act="rm" data-l="imgs" data-i="${i}" aria-label="Remove image">×</button></div>`).join('');
+}
+function addFiles(files){
+  for(const f of files){ if(!f.type.startsWith('image/')) continue;
+    if(f.size>20*1024*1024){setErr(f.name+' is over 20 MB; export a smaller screenshot.');continue}
+    form.imgs.push({file:f,preview:URL.createObjectURL(f),tag:'After',caption:''}) }
+  drawRows();
+}
+async function saveRev(){
+  const rev=$('#r-rev').value.trim(), title=$('#r-title').value.trim();
+  if(!rev) return setErr('Enter a revision label, e.g. B or 03.');
+  if(!title) return setErr('Add a one-line summary of the change.');
+  if(!db) return setErr('Saving isn’t available in this view.');
+  const dup=partRevs(sel).find(r=>r.rev===rev&&r.id!==form.id); if(dup) return setErr('Rev '+rev+' already exists for this part.');
+  const b=$('#rform button[type=submit]'); b.disabled=true;
+  try{
+    const images=[];
+    for(let i=0;i<form.imgs.length;i++){const x=form.imgs[i];
+      if(x.file){ b.textContent=`Uploading ${i+1}/${form.imgs.length}…`; const up=await assets.upload(x.file); images.push({id:up.id,url:up.url,tag:x.tag||'After',caption:x.caption||''}) }
+      else images.push({id:x.id,url:x.url,tag:x.tag||'After',caption:x.caption||''}) }
+    b.textContent='Saving…';
+    const body={partId:sel,rev,date:$('#r-date').value,fusionVer:$('#r-fv').value.trim(),status:$('#r-st').value,title,
+      what:$('#r-what').value.trim(),why:$('#r-why').value.trim(),
+      params:form.params.filter(x=>x.name.trim()).map(x=>({name:x.name.trim(),old:(x.old||'').trim(),new:(x.new||'').trim(),unit:(x.unit||'').trim()})),
+      bom:form.bom.filter(x=>(x.item||'').trim()).map(x=>({action:x.action||'Added',item:x.item.trim(),qty:(x.qty||'').trim(),note:(x.note||'').trim()})),
+      images,updatedAt:Date.now()};
+    if(form.id) await db.doc('revisions/'+form.id).update(body);
+    else{body.createdAt=Date.now(); await db.collection('revisions').add(body)}
+    for(const id of form.removed){try{await assets.delete(id)}catch(e){}}
+    await db.doc('parts/'+sel).update({updatedAt:Date.now()});
+    tab='timeline'; closeOv(); render();
+  }catch(e){b.disabled=false;b.textContent='Try again';setErr('Couldn’t save: '+(e&&e.message||e))}
+}
+
+/* ---------- export ---------- */
+function changelog(p){
+  const rs=partRevs(p.id).slice().reverse();
+  let s=`# ${p.name}${p.partNo?' ('+p.partNo+')':''}\n`;
+  if(p.project) s+=`Project: ${p.project}  \n`; if(p.material) s+=`Material: ${p.material}  \n`;
+  if(p.fusionUrl) s+=`Fusion: ${p.fusionUrl}  \n`;
+  rs.forEach(r=>{
+    s+=`\n## Rev ${r.rev} — ${r.title}\n${r.date||''}${r.fusionVer?' · Fusion '+r.fusionVer:''} · ${STAT[r.status]||r.status}\n`;
+    if(r.what) s+=`\n**What changed:** ${r.what}\n`; if(r.why) s+=`\n**Why:** ${r.why}\n`;
+    const ps=(r.params||[]).filter(x=>x.name);
+    if(ps.length){s+=`\n| Parameter | Was | Now |\n|---|---|---|\n`+ps.map(x=>`| ${x.name} | ${x.old} ${x.unit||''} | ${x.new} ${x.unit||''} |`).join('\n')+'\n'}
+    const bs=(r.bom||[]).filter(x=>x.item);
+    if(bs.length){s+=`\n| BOM | Item | Qty | Note |\n|---|---|---|---|\n`+bs.map(x=>`| ${x.action} | ${x.item} | ${x.qty} | ${x.note} |`).join('\n')+'\n'}
+    (r.images||[]).forEach(im=>{s+=`\n![${im.tag}: ${im.caption||''}](${im.url})`}); if((r.images||[]).length) s+='\n';
+  });
+  return s;
+}
+
+/* ---------- events ---------- */
+let armed=null;
+function arm(btn,label,fn){
+  if(armed===btn){armed=null;fn();return}
+  if(armed){armed.classList.remove('armed');armed.textContent=armed.dataset.orig}
+  armed=btn; btn.dataset.orig=btn.textContent; btn.classList.add('armed'); btn.textContent=label;
+  setTimeout(()=>{if(armed===btn){btn.classList.remove('armed');btn.textContent=btn.dataset.orig;armed=null}},4000);
+}
+document.addEventListener('click',async e=>{
+  const pi=e.target.closest('.pitem'); if(pi){sel=pi.dataset.pid;tab='timeline';render();window.scrollTo(0,0);return}
+  const t=e.target.closest('[data-tab]'); if(t){tab=t.dataset.tab;render();return}
+  const fig=e.target.closest('[data-img]'); if(fig){openImg(fig.dataset.img);return}
+  if(e.target.id==='ov'&&!form){closeOv();return}
+  const a=e.target.closest('[data-act]'); if(!a) return;
+  const act=a.dataset.act, p=parts.find(x=>x.id===sel);
+  if(act==='new-part') partForm();
+  else if(act==='back'){sel=null;render()}
+  else if(act==='close') closeOv();
+  else if(act==='edit-part') partForm(p);
+  else if(act==='regen-no'){form.autoNo=true;$('#p-auto').textContent='· auto';fillNo();if(!$('#p-no').value)setErr('Type a part name first.')}
+  else if(act==='new-rev') revForm();
+  else if(act==='edit-rev') revForm(revs.find(r=>r.id===a.dataset.rid));
+  else if(act==='add-param'){form.params.push({name:'',old:'',new:'',unit:(p&&p.units)||'mm'});drawRows();$('#pp-n'+(form.params.length-1)).focus()}
+  else if(act==='add-bom'){form.bom.push({action:'Added',item:'',qty:'',note:''});drawRows();$('#bb-i'+(form.bom.length-1)).focus()}
+  else if(act==='pull-params'){const rs=partRevs(sel);const l=rs[rs.length-1];
+    const have=new Set(form.params.map(x=>x.name));
+    form.params=form.params.filter(x=>x.name||x.old||x.new);
+    (l.params||[]).forEach(x=>{if(!have.has(x.name))form.params.push({name:x.name,old:x.new,new:x.new,unit:x.unit})});
+    if(!form.params.length) form.params.push({name:'',old:'',new:'',unit:p.units||'mm'});
+    drawRows()}
+  else if(act==='rm'){const l=a.dataset.l,i=+a.dataset.i; const x=form[l][i];
+    if(l==='imgs'){if(x.preview)URL.revokeObjectURL(x.preview); if(x.id)form.removed.push(x.id)}
+    form[l].splice(i,1); drawRows()}
+  else if(act==='del-rev') arm(a,'Confirm delete',async()=>{const r=revs.find(x=>x.id===a.dataset.rid);
+    try{await db.doc('revisions/'+r.id).delete(); if(assets)for(const im of r.images||[]){try{await assets.delete(im.id)}catch(_){}}}catch(err){a.textContent='Couldn’t delete'}})
+  else if(act==='del-part'){const n=partRevs(sel).length;
+    arm(a,n?`Delete part + ${n} rev${n>1?'s':''}?`:'Confirm delete',async()=>{
+      try{for(const r of partRevs(p.id)){await db.doc('revisions/'+r.id).delete(); if(assets)for(const im of r.images||[]){try{await assets.delete(im.id)}catch(_){}}}
+        await db.doc('parts/'+p.id).delete(); sel=null; render()}catch(err){a.textContent='Couldn’t delete'}})}
+  else if(act==='export'){const md=changelog(p);
+    try{await navigator.clipboard.writeText(md); a.textContent='Copied ✓'; setTimeout(()=>{a.textContent='Copy changelog'},1800)}
+    catch(_){openOv(`<div class="panel"><div class="panel-h"><h2>Changelog (Markdown)</h2><button class="btn ghost sm" type="button" data-act="close">Close</button></div>
+      <div class="panel-b"><span class="hint">Select all and copy.</span><textarea class="out" id="mdout" readonly>${esc(md)}</textarea></div></div>`); const ta=$('#mdout'); ta.focus(); ta.select()}}
+});
+function openImg(key){const [rid,i]=key.split(':');const r=revs.find(x=>x.id===rid);if(!r)return;const im=r.images[+i];
+  openOv(`<div class="lb"><img src="${esc(im.url)}" alt="${esc(im.caption||im.tag)}"><div><strong>Rev ${esc(r.rev)} · ${esc(im.tag)}</strong> ${esc(im.caption)}</div><button class="btn sm" type="button" data-act="close">Close</button></div>`)}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&!$('#ov').hidden) closeOv();
+  if(e.key==='Enter'&&e.target.closest('[data-img]')) openImg(e.target.closest('[data-img]').dataset.img);
+});
+document.addEventListener('input',e=>{const el=e.target;
+  if(el.id==='q'){q=el.value.trim().toLowerCase();renderList();return}
+  if(form&&form.kind==='part'){
+    if(el.id==='p-no'){form.autoNo=false;$('#p-auto').textContent=''}
+    else if(el.id==='p-name'||el.id==='p-proj') fillNo();
+    return}
+  if(form&&el.dataset.l){form[el.dataset.l][+el.dataset.i][el.dataset.k]=el.value}});
+document.addEventListener('change',e=>{const el=e.target;
+  if(el.id==='r-files'){addFiles(el.files);el.value='';return}
+  if(form&&el.dataset.l){form[el.dataset.l][+el.dataset.i][el.dataset.k]=el.value}});
+document.addEventListener('submit',e=>{e.preventDefault(); if(e.target.id==='pform')savePart(); else if(e.target.id==='rform')saveRev()});
+document.addEventListener('paste',e=>{if(!form||form.kind!=='rev'||!assets)return;
+  const fs=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>f.type.startsWith('image/'));
+  if(fs.length){e.preventDefault();addFiles(fs)}});
+$('#newPartTop').addEventListener('click',()=>partForm());
+
+/* ---------- boot (local app) ---------- */
+const HDR={'Content-Type':'application/json','X-Requested-With':'cadlog'};
+async function call(method,url,body){
+  const r=await fetch(url,{method,headers:HDR,body:body===undefined?undefined:JSON.stringify(body)});
+  if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(_){}throw new Error(m)}
+  return r.status===204?null:r.json();
+}
+const cache={parts:[],revisions:[]}, subs={parts:[],revisions:[]};
+const snapOf=k=>({docs:cache[k].map(d=>({id:d.id,exists:true,data:()=>d}))});
+async function refresh(){const d=await call('GET','/api/data');cache.parts=d.parts;cache.revisions=d.revisions;for(const k in subs)subs[k].forEach(s=>s.next(snapOf(k)))}
+const newId=()=>(window.crypto&&crypto.randomUUID?crypto.randomUUID().replace(/-/g,''):Date.now().toString(36)+Math.random().toString(36).slice(2,12));
+db={
+  collection:k=>({
+    onSnapshot(next,err){subs[k].push({next,err});refresh().catch(e=>err&&err(e));return()=>{}},
+    async add(body){const id=newId();await call('PUT',`/api/${k}/${id}`,body);await refresh();return{id}}}),
+  doc:path=>{const [k,id]=path.split('/');return{
+    async update(body){await call('PATCH',`/api/${k}/${id}`,body);await refresh()},
+    async delete(){await call('DELETE',`/api/${k}/${id}`);await refresh()}}}
+};
+assets={
+  async upload(file){
+    const r=await fetch('/api/images',{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Requested-With':'cadlog'},body:file});
+    if(!r.ok){let m='HTTP '+r.status;try{m=(await r.json()).error||m}catch(_){}throw new Error(m)}
+    return r.json();
+  },
+  async delete(id){await call('DELETE','/api/images/'+encodeURIComponent(id))}
+};
+render();
+call('GET','/api/info').then(i=>{const s=$('#where');s.textContent=i.dataDir;s.title='Data folder: '+i.dataDir}).catch(()=>{});
+const fail=err=>{const b=$('#banner');b.hidden=false;b.textContent='Can’t reach the local app ('+((err&&err.message)||'error')+'). Check that app.py is still running, then reload.'};
+db.collection('parts').onSnapshot(s=>{parts=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));loaded.p=true;render()},fail);
+db.collection('revisions').onSnapshot(s=>{revs=s.docs.map(d=>Object.assign({},d.data(),{id:d.id}));loaded.r=true;render()},fail);
+})();
+</script>
+
+</body>
+</html>
