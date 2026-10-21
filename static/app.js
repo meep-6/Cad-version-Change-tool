@@ -124,7 +124,7 @@ function revText(r) {
 }
 function hitsFor(p) {
   if (!q) return { match: true, revs: [] };
-  const pm = [p.name, p.partNo, p.project, p.material, p.notes, p.fusionDoc].join(' ').toLowerCase().includes(q);
+  const pm = [p.name, p.partNo, p.project, p.material, p.notes, p.fusionDoc, p.kicadProject].join(' ').toLowerCase().includes(q);
   const revs = revsOf(p.id).filter(r => revText(r).includes(q)).map(r => r.id);
   const nm = ncrsOf(p.id).filter(n => [n.title, n.description, n.rootCause, n.action].join(' ').toLowerCase().includes(q)).length;
   const bm = p.type === 'pcb' && window.PCB ? PCB.boardHits(p.id, q) : 0;
@@ -144,7 +144,7 @@ function renderSide() {
   const list = $('#plist');
   $('#pcount').textContent = D.parts.length ? String(D.parts.length) : '';
   if (!loaded) { list.innerHTML = '<li class="hint" style="padding:8px">Loading…</li>'; return; }
-  if (!D.parts.length) { list.innerHTML = '<li class="hint" style="padding:8px">No parts yet. Add one to start logging revisions.</li>'; return; }
+  if (!D.parts.length) { list.innerHTML = '<li class="hint" style="padding:8px">Nothing yet. Use + New to add a part, assembly or PCB.</li>'; return; }
   const ps = D.parts.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).map(p => ({ p, h: hitsFor(p) })).filter(x => x.h.match);
   if (!ps.length) { list.innerHTML = `<li class="hint" style="padding:8px">Nothing matches “${esc(q)}”.</li>`; return; }
   list.innerHTML = ps.map(({ p, h }) => {
@@ -166,9 +166,9 @@ function render() {
   if (!p) {
     if (sel && loaded) sel = null;
     v.innerHTML = `<div class="empty"><span class="rev big">A</span>
-      <h2>${D.parts.length ? 'Pick a part to see its history' : 'Start your first part'}</h2>
+      <h2>${D.parts.length ? 'Pick an item to see its history' : 'Add your first part, assembly or PCB'}</h2>
       <p>Each part gets a title block and a revision trail: what changed and why, parameter deltas, BOM edits, attached CAD files, verification results, first-article inspection and issues.</p>
-      ${D.parts.length ? '' : '<button class="btn primary" type="button" data-act="new-part">+ New part</button>'}</div>`;
+      ${D.parts.length ? '' : '<button class="btn primary" type="button" data-act="new-part">+ New</button>'}</div>`;
     return;
   }
   const rs = revsOf(p.id), last = rs[rs.length - 1], open = openNcrs(p.id);
@@ -182,19 +182,22 @@ function render() {
         <div class="meta">${p.type === 'assembly' ? '<span class="chip asm">Assembly</span>' : p.type === 'pcb' ? '<span class="chip asm">PCB</span>' : ''}
           ${last ? `<span class="pill ${esc(last.status)}">${esc(STAT[last.status] || last.status)}</span>` : ''}
           ${open ? `<span class="pill Fail">${open} open issue${open > 1 ? 's' : ''}</span>` : ''}
-          ${p.fusionDoc ? `<span class="chip">Fusion: ${esc(p.fusionDoc)}</span>` : ''}
-          ${p.fusionUrl ? `<a href="${esc(p.fusionUrl)}" target="_blank" rel="noopener">Open in Fusion ↗</a>` : ''}</div></div>
+          ${p.type !== 'pcb' && p.fusionDoc ? `<span class="chip">Fusion: ${esc(p.fusionDoc)}</span>` : ''}
+          ${p.type !== 'pcb' && p.fusionUrl ? `<a href="${esc(p.fusionUrl)}" target="_blank" rel="noopener">Open in Fusion ↗</a>` : ''}
+          ${p.type === 'pcb' && p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener">Open project ↗</a>` : ''}</div></div>
       <div class="acts">
         <button class="btn primary" type="button" data-act="new-rev">+ New revision</button>
-        <button class="btn" type="button" data-act="edit-part">Edit part</button>
+        <button class="btn" type="button" data-act="edit-part">Edit ${p.type === 'pcb' ? 'PCB' : p.type === 'assembly' ? 'assembly' : 'part'}</button>
         <a class="btn" href="/report.html?part=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Report</a>
         <button class="btn" type="button" data-act="export">Copy changelog</button>
         <button class="btn danger" type="button" data-act="del-part"${hasReleased ? ' title="Parts with released revisions can’t be deleted"' : ''}>Delete</button>
       </div>
     </div>
     <div class="tb-grid">
-      ${cell('Part no.', p.partNo)}${cell('Project', p.project)}${cell('Material', p.material)}
-      ${cell('Units', p.units || 'mm')}${cell('Revisions', String(rs.length))}${cell('Updated', upd)}
+      ${cell('Part no.', p.partNo)}${cell('Project', p.project)}${p.type === 'pcb'
+        ? cell('KiCad project', p.kicadProject) + cell('Boards', String(D.boards.filter(b => b.partId === p.id).length))
+        : p.type === 'assembly' ? cell('Components', String((p.components || []).length)) + cell('Units', p.units || 'mm')
+        : cell('Material', p.material) + cell('Units', p.units || 'mm')}${cell('Revisions', String(rs.length))}${cell('Updated', upd)}
     </div>
     ${structure(p)}
     ${p.notes ? `<div class="tb-notes">${esc(p.notes)}</div>` : ''}
@@ -361,24 +364,48 @@ function busy(label) { const b = $('#ov button[type=submit]'); if (b) { b.disabl
 function unbusy(label) { const b = $('#ov button[type=submit]'); if (b) { b.disabled = false; b.textContent = label; } }
 
 /* ---------- part form ---------- */
+const TYPES = {
+  part: { label: 'Part', title: 'part', desc: 'A Fusion 360 body or component: material, parameters, inspection.', name: 'Motor mount bracket', notes: 'Design intent, constraints, mating parts' },
+  assembly: { label: 'Assembly', title: 'assembly', desc: 'Parts and quantities, with a warning when a component changes.', name: 'Propulsion pod', notes: 'What it does, how it goes together' },
+  pcb: { label: 'PCB', title: 'PCB', desc: 'A KiCad board: BOM import and diff, fab orders, board serials.', name: 'Flight controller', notes: 'Function, interfaces, power budget' },
+};
 function partForm(p, preset) {
   p = p || Object.assign({ type: 'part' }, preset || {});
-  form = { kind: 'part', id: p.id || null, autoNo: !p.id || !p.partNo, components: (p.components || []).map(c => ({ ...c })), after: preset && preset.after };
-  openOv(panel(p.id ? 'Edit part' : 'New part', `<div class="grid">
-      <div class="f s2"><label for="p-name">Name</label><input id="p-name" value="${esc(p.name)}" placeholder="Motor mount bracket" required></div>
-      <div class="f"><label for="p-no">Part no. <span id="p-auto" class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">${form.autoNo ? '· auto' : ''}</span></label><input id="p-no" class="mono" value="${esc(p.partNo)}" placeholder="Fills from name"><button class="linkbtn" type="button" data-act="regen-no" style="align-self:flex-start;font-size:12px">Regenerate</button></div>
-      <div class="f"><label for="p-type">Type</label><select id="p-type"><option value="part"${p.type !== 'assembly' ? ' selected' : ''}>Part</option><option value="assembly"${p.type === 'assembly' ? ' selected' : ''}>Assembly</option><option value="pcb"${p.type === 'pcb' ? ' selected' : ''}>PCB</option></select></div>
-      <div class="f s2"><label for="p-proj">Project</label><input id="p-proj" value="${esc(p.project)}" placeholder="Project or programme"></div>
-      <div class="f"><label for="p-mat">Material</label><input id="p-mat" value="${esc(p.material)}" placeholder="Al 6061-T6, PETG…"></div>
-      <div class="f"><label for="p-units">Units</label><select id="p-units">${['mm', 'in', 'm'].map(u => `<option${(p.units || 'mm') === u ? ' selected' : ''}>${u}</option>`).join('')}</select></div>
-      <div class="f s2"><label for="p-doc">Fusion 360 design name</label><input id="p-doc" value="${esc(p.fusionDoc)}" placeholder="Matches captures from the Fusion add-in"></div>
-      <div class="f s2"><label for="p-url">Fusion 360 link</label><input id="p-url" value="${esc(p.fusionUrl)}" placeholder="https://a360.co/…" inputmode="url"></div>
-      <div class="f s4"><label for="p-notes">Notes</label><textarea id="p-notes" placeholder="Design intent, constraints, mating parts">${esc(p.notes)}</textarea></div>
+  const type = TYPES[p.type] ? p.type : 'part', fixed = !!(p.id && revsOf(p.id).length);
+  form = { kind: 'part', id: p.id || null, type, autoNo: !p.id || !p.partNo, components: (p.components || []).map(c => ({ ...c })), after: preset && preset.after };
+  const f = (types, cls, html) => `<div class="f ${cls}" data-types="${types}">${html}</div>`;
+  openOv(panel(`<span id="p-title">${p.id ? 'Edit' : 'New'} ${TYPES[type].title}</span>`, `
+    <div class="typepick" role="radiogroup" aria-label="Type">${Object.entries(TYPES).map(([k, t]) => `
+      <label class="tp${k === type ? ' on' : ''}${fixed && k !== type ? ' off' : ''}"><input type="radio" name="p-type" id="p-type-${k}" value="${k}"${k === type ? ' checked' : ''}${fixed && k !== type ? ' disabled' : ''}>
+        <span class="tp-l">${t.label}</span><span class="tp-d">${t.desc}</span></label>`).join('')}</div>
+    ${fixed ? '<span class="hint">The type is fixed because this item already has revisions.</span>' : ''}
+    <div class="grid">
+      ${f('part assembly pcb', 's2', `<label for="p-name">Name</label><input id="p-name" value="${esc(p.name)}" placeholder="${esc(TYPES[type].name)}" required>`)}
+      ${f('part assembly pcb', 's2', `<label for="p-no">Part no. <span id="p-auto" class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">${form.autoNo ? '· auto' : ''}</span></label><input id="p-no" class="mono" value="${esc(p.partNo)}" placeholder="Fills from name and project"><button class="linkbtn" type="button" data-act="regen-no" style="align-self:flex-start;font-size:12px">Regenerate</button>`)}
+      ${f('part assembly pcb', 's2', `<label for="p-proj">Project</label><input id="p-proj" value="${esc(p.project)}" placeholder="Project or programme" list="p-proj-list"><datalist id="p-proj-list">${[...new Set(D.parts.map(x => x.project).filter(Boolean))].map(x => `<option value="${esc(x)}">`).join('')}</datalist>`)}
+      ${f('part', '', `<label for="p-mat">Material</label><input id="p-mat" value="${esc(p.material)}" placeholder="Al 6061-T6, PETG…">`)}
+      ${f('part assembly', '', `<label for="p-units">Units</label><select id="p-units">${['mm', 'in', 'm'].map(u => `<option${(p.units || 'mm') === u ? ' selected' : ''}>${u}</option>`).join('')}</select>`)}
+      ${f('part assembly', 's2', `<label for="p-doc">Fusion 360 design name</label><input id="p-doc" value="${esc(p.fusionDoc)}" placeholder="Matches captures from the Fusion add-in">`)}
+      ${f('part assembly', 's2', `<label for="p-url">Fusion 360 link</label><input id="p-url" value="${esc(p.fusionUrl)}" placeholder="https://a360.co/…" inputmode="url">`)}
+      ${f('pcb', 's2', `<label for="p-kicad">KiCad project</label><input id="p-kicad" value="${esc(p.kicadProject)}" placeholder="flight_controller.kicad_pro">`)}
+      ${f('pcb', 's2', `<label for="p-link">Project link</label><input id="p-link" value="${esc(p.link)}" placeholder="https://github.com/… (repo or shared folder)" inputmode="url">`)}
+      ${f('part assembly pcb', 's4', `<label for="p-notes">Notes</label><textarea id="p-notes" placeholder="${esc(TYPES[type].notes)}">${esc(p.notes)}</textarea>`)}
     </div>
-    <div class="sec" id="comp-sec"${p.type === 'assembly' ? '' : ' hidden'}><div class="sec-h"><div class="lbl">Components</div><button class="linkbtn" type="button" data-act="add-comp">+ Add component</button></div><div class="rows" id="crows"></div></div>`,
-    p.id ? 'Save part' : 'Create part', { id: 'pform' }));
+    <div class="sec" id="comp-sec" data-types="assembly"><div class="sec-h"><div class="lbl">Components</div><button class="linkbtn" type="button" data-act="add-comp">+ Add component</button></div><div class="rows" id="crows"></div></div>`,
+    p.id ? 'Save' : 'Create ' + TYPES[type].title, { id: 'pform' }));
+  applyType(type, !!p.id);
   drawComps();
   if (form.autoNo) fillNo();
+  setTimeout(() => { const n = $('#p-name'); if (n) n.focus(); }, 0);
+}
+function applyType(type, editing) {
+  form.type = type;
+  document.querySelectorAll('#pform [data-types]').forEach(el => { el.hidden = !el.dataset.types.split(' ').includes(type); });
+  document.querySelectorAll('#pform .tp').forEach(el => el.classList.toggle('on', el.querySelector('input').value === type));
+  const t = TYPES[type];
+  $('#p-title').textContent = (editing ? 'Edit ' : 'New ') + t.title;
+  $('#p-name').placeholder = t.name; $('#p-notes').placeholder = t.notes;
+  if (!editing) $('#pform button[type=submit]').textContent = 'Create ' + t.title;
 }
 function drawComps() {
   const el = $('#crows'); if (!el) return;
@@ -390,11 +417,13 @@ function drawComps() {
 }
 function fillNo() { const n = $('#p-no'); if (n && form && form.autoNo) n.value = autoPartNo($('#p-name').value, $('#p-proj').value, form.id); }
 async function savePart() {
-  const name = $('#p-name').value.trim(); if (!name) return setErr('Give the part a name.');
-  let url = $('#p-url').value.trim(); if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
-  const type = $('#p-type').value;
-  const body = { name, partNo: $('#p-no').value.trim(), type, units: $('#p-units').value, project: $('#p-proj').value.trim(),
-    material: $('#p-mat').value.trim(), fusionDoc: $('#p-doc').value.trim(), fusionUrl: url, notes: $('#p-notes').value.trim(),
+  const name = $('#p-name').value.trim(); if (!name) return setErr('Give it a name.');
+  const fixUrl = v => { v = v.trim(); return v && !/^https?:\/\//i.test(v) ? 'https://' + v : v; };
+  const type = form.type;
+  // fields for other types are kept as they were, so switching type before saving loses nothing
+  const body = { name, partNo: $('#p-no').value.trim(), type, project: $('#p-proj').value.trim(), notes: $('#p-notes').value.trim(),
+    units: $('#p-units').value, material: $('#p-mat').value.trim(), fusionDoc: $('#p-doc').value.trim(), fusionUrl: fixUrl($('#p-url').value),
+    kicadProject: $('#p-kicad').value.trim(), link: fixUrl($('#p-link').value),
     components: type === 'assembly' ? form.components.filter(c => c.partId).map(c => ({ partId: c.partId, qty: String(c.qty || '1').trim() || '1' })) : [],
     updatedAt: Date.now() };
   const dupNo = body.partNo && D.parts.find(x => x.id !== form.id && (x.partNo || '').toUpperCase() === body.partNo.toUpperCase());
@@ -820,7 +849,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'fai-rev') { faiRev = el.value; render(); return; }
-  if (el.id === 'p-type') { $('#comp-sec').hidden = el.value !== 'assembly'; return; }
+  if (el.name === 'p-type') { applyType(el.value, !!form.id); return; }
   if (el.id === 'r-st') { $('#rel-note').hidden = el.value !== 'Released'; return; }
   if (el.id === 'r-imgs') { addImages(el.files); el.value = ''; return; }
   if (el.id === 'r-files') { addFiles(el.files); el.value = ''; return; }
