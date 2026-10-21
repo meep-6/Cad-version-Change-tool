@@ -218,3 +218,4 @@ ul.dl{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3p
 .tp-l{font-family:var(--f-display);font-size:18px;font-weight:600;letter-spacing:.02em}
 .tp-d{font-size:12px;color:var(--muted);line-height:1.35}
 @media (max-width:760px){.typepick{grid-template-columns:1fr}}
+.tag-mini{font-size:9px;font-weight:600;letter-spacing:.06em;color:var(--accent);margin-left:2px}

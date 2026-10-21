@@ -50,6 +50,12 @@ const ncrsOf = pid => D.ncrs.filter(n => n.partId === pid).sort((a, b) => (b.cre
 const openNcrs = pid => ncrsOf(pid).filter(n => n.status !== 'Closed').length;
 const usedIn = pid => D.parts.filter(a => a.type === 'assembly' && (a.components || []).some(c => c.partId === pid));
 const isLocked = r => !!r && r.status === 'Released';
+function containersOf(id, seen = new Set()) { // every assembly that includes id, directly or through sub-assemblies
+  for (const a of usedIn(id)) if (!seen.has(a.id)) { seen.add(a.id); containersOf(a.id, seen); }
+  return seen;
+}
+const canContain = (asm, id) => asm.id !== id && !containersOf(asm.id).has(id); // false if it would create a loop
+const typeTag = p => p.type === 'pcb' ? ' <span class="tag-mini">PCB</span>' : p.type === 'assembly' ? ' <span class="tag-mini">ASM</span>' : '';
 const partLabel = p => p ? (p.partNo ? p.partNo + ' · ' : '') + p.name : 'Missing part';
 const revLabel = id => { const r = revById(id); return r ? 'Rev ' + r.rev : '—'; };
 const fileUrl = f => f.url || ('/files/' + encodeURIComponent(f.id) + '?name=' + encodeURIComponent(f.name || f.id));
@@ -225,18 +231,18 @@ function structure(p) {
     const la = latest(p.id);
     h += `<div class="tb-row"><span class="k-inline">Components</span>${comps.length ? comps.map(c => {
       const cp = partById(c.partId), cr = latest(c.partId);
-      return cp ? `<button class="chip${stale.has(c.partId) ? ' warn' : ''}" type="button" data-goto="${esc(cp.id)}" title="${stale.has(c.partId) ? 'Revised after this assembly’s Rev ' + esc(la.rev) : ''}">${esc(cp.partNo || cp.name)} ${cr ? 'Rev ' + esc(cr.rev) : ''} ×${esc(c.qty || 1)}</button>` : '<span class="chip">Missing part</span>';
-    }).join('') : '<span class="hint">None yet. Add components in Edit part.</span>'}</div>`;
+      return cp ? `<button class="chip${stale.has(c.partId) ? ' warn' : ''}" type="button" data-goto="${esc(cp.id)}" title="${esc(cp.name)}${stale.has(c.partId) ? ' · revised after this assembly’s Rev ' + esc(la.rev) : ''}">${esc(cp.partNo || cp.name)}${typeTag(cp)} ${cr ? 'Rev ' + esc(cr.rev) : ''} ×${esc(c.qty || 1)}</button>` : '<span class="chip">Missing part</span>';
+    }).join('') : '<span class="hint">None yet.</span>'}<button class="linkbtn" type="button" data-act="edit-part">Edit components</button></div>`;
     if (stale.size) h += `<div class="tb-row"><span class="notice warn">${stale.size} component${stale.size > 1 ? 's were' : ' was'} revised after Rev ${esc(la.rev)} of this assembly. Check fit and log a new assembly revision if needed.</span></div>`;
   }
-  const ui = usedIn(p.id);
-  if (ui.length) {
+  const ui = usedIn(p.id), targets = D.parts.filter(a => a.type === 'assembly' && canContain(a, p.id));
+  if (ui.length || targets.length) {
     const lp = latest(p.id);
-    h += `<div class="tb-row"><span class="k-inline">Used in</span>${ui.map(a => {
+    h += `<div class="tb-row"><span class="k-inline">Used in</span>${ui.length ? '' : '<span class="hint">No assembly yet.</span>'}${ui.map(a => {
       const la = latest(a.id); const newer = lp && la && (lp.createdAt || 0) > (la.createdAt || 0);
       const q1 = (a.components.find(c => c.partId === p.id) || {}).qty || 1;
-      return `<button class="chip${newer ? ' warn' : ''}" type="button" data-goto="${esc(a.id)}" title="${newer ? 'This part changed after the assembly’s Rev ' + esc(la.rev) : ''}">${esc(a.partNo || a.name)} ${la ? 'Rev ' + esc(la.rev) : ''} ×${esc(q1)}</button>`;
-    }).join('')}</div>`;
+      return `<button class="chip${newer ? ' warn' : ''}" type="button" data-goto="${esc(a.id)}" title="${esc(a.name)}${newer ? ' · this item changed after the assembly’s Rev ' + esc(la.rev) : ''}">${esc(a.partNo || a.name)} ${la ? 'Rev ' + esc(la.rev) : ''} ×${esc(q1)}</button>`;
+    }).join('')}${targets.some(a => !ui.includes(a)) ? '<button class="linkbtn" type="button" data-act="add-to-asm">+ Add to assembly</button>' : ''}</div>`;
   }
   return h;
 }
@@ -409,9 +415,12 @@ function applyType(type, editing) {
 }
 function drawComps() {
   const el = $('#crows'); if (!el) return;
-  const opts = D.parts.filter(x => x.id !== form.id).sort((a, b) => a.name.localeCompare(b.name));
+  const self = { id: form.id || '__new' };
+  const ok = D.parts.filter(x => !form.id || canContain(self, x.id) && !containersOf(form.id).has(x.id)).filter(x => x.id !== form.id).sort((a, b) => a.name.localeCompare(b.name));
+  const groups = [['part', 'Parts'], ['pcb', 'PCBs'], ['assembly', 'Sub-assemblies']];
+  const options = c => groups.map(([t, label]) => { const xs = ok.filter(x => (x.type || 'part') === t); return xs.length ? `<optgroup label="${label}">${xs.map(o => `<option value="${esc(o.id)}"${o.id === c.partId ? ' selected' : ''}>${esc(partLabel(o))}</option>`).join('')}</optgroup>` : ''; }).join('');
   el.innerHTML = form.components.map((c, i) => `<div class="crow">
-    <select class="rowin" data-l="components" data-i="${i}" data-k="partId" id="cc-p${i}" aria-label="Component part"><option value="">Choose a part…</option>${opts.map(o => `<option value="${esc(o.id)}"${o.id === c.partId ? ' selected' : ''}>${esc(partLabel(o))}</option>`).join('')}</select>
+    <select class="rowin" data-l="components" data-i="${i}" data-k="partId" id="cc-p${i}" aria-label="Component"><option value="">Choose a part, PCB or sub-assembly…</option>${options(c)}</select>
     <input class="rowin mono" data-l="components" data-i="${i}" data-k="qty" id="cc-q${i}" value="${esc(c.qty)}" placeholder="Qty" aria-label="Quantity">
     <button class="x" type="button" data-act="rm" data-l="components" data-i="${i}" aria-label="Remove component">×</button></div>`).join('') || '<span class="hint">No components yet.</span>';
 }
@@ -436,6 +445,25 @@ async function savePart() {
     const after = form.after; closeOv(); await refresh();
     if (after) after(id);
   } catch (e) { unbusy('Save'); setErr('Couldn’t save: ' + e.message); }
+}
+
+/* ---------- add to assembly (from a part or PCB page) ---------- */
+function addToAsmForm(p) {
+  const ui = usedIn(p.id), targets = D.parts.filter(a => a.type === 'assembly' && canContain(a, p.id) && !ui.includes(a)).sort((a, b) => a.name.localeCompare(b.name));
+  form = { kind: 'addasm', pid: p.id };
+  openOv(panel(`Add ${esc(p.name)} to an assembly`, `<div class="grid">
+    <div class="f s4"><label for="aa-asm">Assembly</label><select id="aa-asm">${targets.map(a => `<option value="${esc(a.id)}">${esc(partLabel(a))}</option>`).join('')}</select></div>
+    <div class="f"><label for="aa-qty">Qty</label><input id="aa-qty" class="mono" value="1" inputmode="numeric"></div></div>
+    <span class="hint">The assembly’s component list updates. Log a new assembly revision if this changes the build.</span>`, 'Add to assembly', { id: 'aaform', narrow: true }));
+}
+async function saveAddToAsm() {
+  const a = partById($('#aa-asm').value); if (!a) return setErr('Pick an assembly.');
+  const qty = $('#aa-qty').value.trim() || '1';
+  busy('Adding…');
+  try {
+    await api.patch('parts', a.id, { components: (a.components || []).filter(c => c.partId !== form.pid).concat([{ partId: form.pid, qty }]), updatedAt: Date.now() });
+    closeOv(); await refresh();
+  } catch (e) { unbusy('Add to assembly'); setErr('Couldn’t add: ' + e.message); }
 }
 
 /* ---------- revision form (full, or verification-only for released revs) ---------- */
@@ -750,6 +778,7 @@ document.addEventListener('click', async e => {
     case 'close': closeOv(); break;
     case 'show-all': showAll = true; render(); break;
     case 'edit-part': partForm(p); break;
+    case 'add-to-asm': addToAsmForm(p); break;
     case 'new-rev': revForm(); break;
     case 'edit-rev': case 'edit-tests': revForm(revById(a.dataset.rid)); break;
     case 'goto-fai': faiRev = a.dataset.rid; tab = 'fai'; render(); break;
@@ -860,7 +889,7 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('submit', e => {
   e.preventDefault();
-  ({ pform: savePart, rform: saveRev, qform: saveFai, nform: saveNcr, cform: continueCapture }[e.target.id] || (window.PCB && PCB.submit[e.target.id]) || (() => {}))();
+  ({ pform: savePart, rform: saveRev, qform: saveFai, nform: saveNcr, cform: continueCapture, aaform: saveAddToAsm }[e.target.id] || (window.PCB && PCB.submit[e.target.id]) || (() => {}))();
 });
 document.addEventListener('paste', e => {
   if (!form || form.kind !== 'rev' || form.mode !== 'full') return;
