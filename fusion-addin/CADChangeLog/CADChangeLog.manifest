@@ -1,0 +1,13 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "id": "f07661c5-52d2-4486-96ef-051daccdda66",
+  "author": "meep-6",
+  "description": {
+    "": "Send the active design's version, user parameters, a screenshot and a STEP export to CAD Change Log."
+  },
+  "version": "1.0.0",
+  "runOnStartup": true,
+  "supportedOS": "windows|mac",
+  "editEnabled": true
+}

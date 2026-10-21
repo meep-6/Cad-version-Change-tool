@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Design Report</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Single light look on purpose: this page is made to be printed or saved as PDF. */
+:root{--ink:#182024;--muted:#5A676C;--line:#C9D1D0;--soft:#F3F6F5;--accent:#0B6A6F;--ok:#256F45;--ok-bg:#DFF0E5;--warn:#8C5A00;--warn-bg:#FAEDD2;--bad:#B0261E;--bad-bg:#FBE4E2;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--f-body:"IBM Plex Sans",system-ui,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;background:#E7EBEA}
+body{color:var(--ink);font-family:var(--f-body);font-size:12.5px;line-height:1.45}
+.bar{display:flex;gap:10px;align-items:center;justify-content:flex-end;max-width:210mm;margin:16px auto 0;padding:0 16px}
+.bar button{font:inherit;font-weight:600;padding:8px 14px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+.bar .hint{color:var(--muted);margin-right:auto}
+.sheet{background:#fff;max-width:210mm;margin:12px auto 32px;padding:14mm 14mm 18mm;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+h1{font-family:var(--f-display);font-size:30px;line-height:1.05;margin:0}
+h2{font-family:var(--f-display);font-size:19px;margin:22px 0 8px;padding-bottom:4px;border-bottom:1.5px solid var(--ink);text-transform:uppercase;letter-spacing:.04em}
+h3{font-size:14px;margin:0;flex:1}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tb{border:1.5px solid var(--ink);margin-top:12px}
+.tb-top{display:flex;gap:14px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--ink)}
+.rev{display:inline-grid;place-items:center;min-width:28px;height:24px;padding:0 6px;border:1.5px solid var(--ink);font-family:var(--f-mono);font-weight:500;border-radius:2px}
+.rev.big{min-width:42px;height:36px;font-size:17px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.cell{padding:6px 10px;border-right:1px solid var(--line);border-top:1px solid var(--line)}
+.cell:nth-child(4n){border-right:0}
+.k{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.v{font-family:var(--f-mono);font-size:12px;overflow-wrap:anywhere}
+table{border-collapse:collapse;width:100%;margin:4px 0 8px}
+th{text-align:left;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--ink)}
+td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num{font-family:var(--f-mono);white-space:nowrap}
+.pill{display:inline-block;font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:99px;white-space:nowrap}
+.Released,.Pass,.Closed{background:var(--ok-bg);color:var(--ok)}
+.Draft,.Pending,.Open{background:var(--warn-bg);color:var(--warn)}
+.Review{background:#DAECEB;color:var(--accent)}
+.Fail{background:var(--bad-bg);color:var(--bad)}
+.rv{border:1px solid var(--line);padding:10px 12px;margin:10px 0;break-inside:avoid-page}
+.rv-h{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.meta{color:var(--muted);font-size:11.5px;margin-bottom:6px}
+.lbl{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.prose{white-space:pre-wrap}
+.imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px}
+.imgs figure{margin:0;border:1px solid var(--line)}
+.imgs img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}
+.imgs figcaption{font-size:10px;padding:3px 6px}
+.foot{margin-top:24px;color:var(--muted);font-size:10.5px;display:flex;justify-content:space-between}
+.empty{color:var(--muted)}
+@media (max-width:640px){.sheet{padding:16px}.grid{grid-template-columns:repeat(2,1fr)}.cell:nth-child(2n){border-right:0}.two{grid-template-columns:1fr}.imgs{grid-template-columns:1fr 1fr}}
+@page{size:A4;margin:12mm}
+@media print{html,body{background:#fff}.bar{display:none}.sheet{box-shadow:none;margin:0;padding:0;max-width:none}h2{break-after:avoid}}
+</style>
+</head>
+<body>
+<div class="bar"><span class="hint">Use Print → Save as PDF to export.</span><button type="button" onclick="window.print()">Print / Save PDF</button></div>
+<div class="sheet" id="doc"><p class="empty">Loading…</p></div>
+<script>
+(function(){
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate=s=>{if(!s)return '—';const d=new Date(s+'T00:00:00');return isNaN(d)?esc(s):d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})};
+const STAT={Draft:'Draft',Review:'In review',Released:'Released'};
+function faiResult(it){const m=String(it.meas||'').trim();if(!m)return 'Pending';const ml=m.toLowerCase();
+  if(['ok','pass','yes','go'].includes(ml))return 'Pass';if(['nok','fail','no','no-go','nogo'].includes(ml))return 'Fail';
+  const nom=parseFloat(it.nom),v=parseFloat(m);if(isNaN(nom)||isNaN(v))return 'Pending';
+  const lo=nom-Math.abs(parseFloat(it.tm)||0),hi=nom+Math.abs(parseFloat(it.tp)||0);return(v>=lo-1e-9&&v<=hi+1e-9)?'Pass':'Fail'}
+const cell=(k,v)=>`<div class="cell"><div class="k">${k}</div><div class="v">${esc(v||'—')}</div></div>`;
+const table=(heads,rows)=>rows.length?`<table><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`:'';
+
+fetch('/api/data').then(r=>r.json()).then(D=>{
+  const pid=new URLSearchParams(location.search).get('part');
+  const p=D.parts.find(x=>x.id===pid), doc=document.getElementById('doc');
+  if(!p){doc.innerHTML='<p class="empty">Part not found. Open the report from a part in CAD Change Log.</p>';return}
+  const byId=id=>D.parts.find(x=>x.id===id);
+  const rs=D.revisions.filter(r=>r.partId===p.id).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const last=rs[rs.length-1], ncrs=D.ncrs.filter(n=>n.partId===p.id);
+  const revOf=id=>{const r=D.revisions.find(x=>x.id===id);return r?'Rev '+r.rev:'—'};
+  const latestRev=id=>{const x=D.revisions.filter(r=>r.partId===id).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));return x[x.length-1]};
+  document.title=(p.partNo?p.partNo+' ':'')+p.name+' — Design Report';
+  let h=`<h1>${esc(p.name)}</h1><div class="meta">Design record${p.type==='assembly'?' · Assembly':''} · generated ${new Date().toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</div>
+  <div class="tb"><div class="tb-top"><span class="rev big">${last?esc(last.rev):'–'}</span><div><div class="k">Current revision</div>${last?`<strong>${esc(last.title)}</strong> <span class="pill ${esc(last.status)}">${esc(STAT[last.status]||last.status)}</span>`:'No revisions'}</div></div>
+  <div class="grid">${cell('Part no.',p.partNo)}${cell('Project',p.project)}${cell('Material',p.material)}${cell('Units',p.units||'mm')}
+  ${cell('Fusion design',p.fusionDoc)}${cell('Revisions',String(rs.length))}${cell('Open issues',String(ncrs.filter(n=>n.status!=='Closed').length))}${cell('Last update',last?last.date:'')}</div></div>`;
+  if(p.notes)h+=`<div class="lbl">Notes</div><div class="prose">${esc(p.notes)}</div>`;
+  if(p.type==='assembly'&&(p.components||[]).length){
+    h+=`<h2>Components</h2>`+table(['Part no.','Name','Qty','Current rev'],p.components.map(c=>{const cp=byId(c.partId),cr=cp&&latestRev(cp.id);
+      return `<tr><td class="num">${esc(cp?cp.partNo:'')}</td><td>${esc(cp?cp.name:'Missing part')}</td><td class="num">${esc(c.qty)}</td><td class="num">${cr?esc(cr.rev):'—'}</td></tr>`}));
+  }
+  const used=D.parts.filter(a=>a.type==='assembly'&&(a.components||[]).some(c=>c.partId===p.id));
+  if(used.length)h+=`<div class="lbl">Used in</div><div>${used.map(a=>esc((a.partNo?a.partNo+' ':'')+a.name)).join(', ')}</div>`;
+
+  h+=`<h2>Revision history</h2>`+(rs.length?table(['Rev','Date','Fusion','Status','Summary'],rs.slice().reverse().map(r=>
+    `<tr><td class="num">${esc(r.rev)}</td><td class="num">${esc(r.date)}</td><td class="num">${esc(r.fusionVer)}</td><td><span class="pill ${esc(r.status)}">${esc(STAT[r.status]||r.status)}</span></td><td>${esc(r.title)}</td></tr>`)):'<p class="empty">No revisions logged.</p>');
+
+  rs.slice().reverse().forEach(r=>{
+    const ps=(r.params||[]).filter(x=>x.name), bs=(r.bom||[]).filter(x=>x.item), ts=(r.tests||[]).filter(t=>t.description);
+    const items=(r.fai&&r.fai.items)||[], fixes=ncrs.filter(n=>n.fixedRevId===r.id);
+    h+=`<section class="rv"><div class="rv-h"><span class="rev">${esc(r.rev)}</span><h3>${esc(r.title)}</h3><span class="pill ${esc(r.status)}">${esc(STAT[r.status]||r.status)}</span></div>
+      <div class="meta">${fmtDate(r.date)}${r.fusionVer?' · Fusion '+esc(r.fusionVer):''}${fixes.length?' · Fixes: '+fixes.map(n=>esc(n.title)).join(', '):''}</div>
+      ${r.what||r.why?`<div class="two"><div><div class="lbl">What changed</div><div class="prose">${esc(r.what||'—')}</div></div><div><div class="lbl">Why</div><div class="prose">${esc(r.why||'—')}</div></div></div>`:''}
+      ${ps.length?'<div class="lbl">Parameters</div>'+table(['Parameter','Was','Now'],ps.map(x=>`<tr><td>${esc(x.name)}</td><td class="num">${x.old?esc(x.old)+' '+esc(x.unit):'—'}</td><td class="num">${x.new?esc(x.new)+' '+esc(x.unit):'—'}</td></tr>`)):''}
+      ${bs.length?'<div class="lbl">BOM changes</div>'+table(['Change','Item','Qty','Note'],bs.map(b=>`<tr><td>${esc(b.action)}</td><td>${esc(b.item)}</td><td class="num">${esc(b.qty)}</td><td>${esc(b.note)}</td></tr>`)):''}
+      ${ts.length?'<div class="lbl">Verification</div>'+table(['Method','Check','Result','Notes','Data'],ts.map(t=>`<tr><td>${esc(t.method)}</td><td>${esc(t.description)}</td><td><span class="pill ${esc(t.result)}">${esc(t.result)}</span></td><td>${esc(t.notes)}</td><td>${t.file?esc(t.file.name):''}</td></tr>`)):''}
+      ${items.length?`<div class="lbl">First-article inspection${r.fai.serial?' · S/N '+esc(r.fai.serial):''}${r.fai.date?' · '+fmtDate(r.fai.date):''}${r.fai.inspector?' · '+esc(r.fai.inspector):''}</div>`+table(['#','Characteristic','Nominal','Tol','Measured','Result'],items.map(it=>{const res=faiResult(it);
+        return `<tr><td class="num">${esc(it.n)}</td><td>${esc(it.char)}</td><td class="num">${esc(it.nom)} ${esc(it.unit)}</td><td class="num">−${esc(String(it.tm||0).replace(/^-/,''))} / +${esc(String(it.tp||0).replace(/^\+/,''))}</td><td class="num">${esc(it.meas)}</td><td><span class="pill ${res}">${res}</span></td></tr>`})):''}
+      ${(r.files||[]).length?`<div class="lbl">Files</div><div class="mono">${r.files.map(f=>esc(f.name)).join(' · ')}</div>`:''}
+      ${(r.images||[]).length?`<div class="imgs">${r.images.slice(0,6).map(im=>`<figure><img src="${esc(im.url)}" alt=""><figcaption><strong>${esc(im.tag)}</strong> ${esc(im.caption)}</figcaption></figure>`).join('')}</div>`:''}
+    </section>`;
+  });
+
+  if(ncrs.length){
+    h+=`<h2>Issues</h2>`+table(['Date','Issue','Found','Root cause','Action','Fixed','Status'],ncrs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(n=>
+      `<tr><td class="num">${esc(n.date)}</td><td>${esc(n.title)}</td><td class="num">${esc(revOf(n.revId))}</td><td>${esc(n.rootCause)}</td><td>${esc(n.action)}</td><td class="num">${n.fixedRevId?esc(revOf(n.fixedRevId)):'—'}</td><td><span class="pill ${esc(n.status)}">${esc(n.status)}</span></td></tr>`));
+  }
+  h+=`<div class="foot"><span>${esc(p.partNo||'')} ${esc(p.name)}</span><span>CAD Change Log</span></div>`;
+  doc.innerHTML=h;
+}).catch(e=>{document.getElementById('doc').innerHTML='<p class="empty">Couldn’t load data. Is app.py still running?</p>'});
+})();
+</script>
+</body>
+</html>
