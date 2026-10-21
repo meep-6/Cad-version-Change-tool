@@ -20,6 +20,19 @@ issues. Runs locally; nothing goes online.
 - **Backups:** a snapshot of the log on every launch (last 20 kept), and automatic recovery
   from the newest readable copy if `log.json` is ever damaged.
 
+**PCBs** (part type *PCB*)
+- **KiCad BOM import:** the Symbol Fields Table CSV export, or the `.kicad_sch` files directly
+  (select every sheet). MPN, Manufacturer, LCSC/Digi-Key/Mouser and DNP fields are picked up;
+  power symbols and multi-unit duplicates are handled, and unannotated symbols are flagged.
+- **BOM diff** against the previous revision: added, removed and changed references
+  (e.g. `R5: 10k → 4.7k`)
+- Unit prices, cost per board and a *build N boards* quantity/cost calculator; export CSV.
+  Prices carry over to new revisions for unchanged parts.
+- **Fab spec** (layers, thickness, finish…), fab files, and an **order log** per revision
+- **Boards:** a serial per assembled board (`TC9-FC-001-B03`) with status, bring-up checklist
+  results and rework history. Checklists are set per revision and carry forward.
+- Released PCB revisions lock the BOM and fab spec; prices, orders and checklists stay editable.
+
 **Evidence**
 - **Verification** per revision: test, analysis, inspection or demonstration, with
   pass/fail and an attached data file
@@ -74,7 +87,7 @@ To keep the log elsewhere (e.g. a synced or versioned folder):
 | File | Purpose |
 |---|---|
 | `app.py` | Local server and storage |
-| `index.html`, `static/` | The app |
+| `index.html`, `static/` | The app (`static/pcb.js` is the PCB module) |
 | `report.html` | Printable part report |
 | `fusion-addin/` | Fusion 360 capture add-in |
 | `Start CAD Log.bat`, `start.sh` | Launchers |

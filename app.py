@@ -5,7 +5,7 @@ Run:  python app.py            (Python 3.8+, standard library only)
       python app.py --data D:/CAD/log --port 8800 --no-browser
 
 Everything is stored in the data folder (default: ./data next to this file):
-  data/log.json        parts, revisions, issues and Fusion captures (pretty JSON)
+  data/log.json        parts, revisions, issues, PCB boards and Fusion captures (pretty JSON)
   data/log.json.bak    the previous save
   data/backups/        a snapshot of log.json from each launch (last 20 kept)
   data/images/         screenshots attached to revisions
@@ -27,8 +27,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-COLLS = ("parts", "revisions", "ncrs", "captures")
-LOCK_EDITABLE = {"tests", "fai", "updatedAt"}  # fields still editable on a released revision
+COLLS = ("parts", "revisions", "ncrs", "captures", "boards")
+LOCK_EDITABLE = {"tests", "fai", "orders", "bringup", "bomCosts", "updatedAt"}  # still editable once released
 IMG_EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif",
            "image/webp": ".webp", "image/bmp": ".bmp"}
 IMG_TYPES = {v: k for k, v in IMG_EXT.items()}
@@ -45,6 +45,7 @@ STATIC = {
     "/report.html": ("report.html", "text/html; charset=utf-8"),
     "/static/app.js": ("static/app.js", "text/javascript; charset=utf-8"),
     "/static/app.css": ("static/app.css", "text/css; charset=utf-8"),
+    "/static/pcb.js": ("static/pcb.js", "text/javascript; charset=utf-8"),
 }
 PORT_FILE = os.path.join(os.path.expanduser("~"), ".cad-change-log.json")
 

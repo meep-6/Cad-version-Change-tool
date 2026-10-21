@@ -33,13 +33,13 @@ const api = {
 };
 
 /* ================= state ================= */
-let D = { parts: [], revisions: [], ncrs: [], captures: [] }, lastJson = '', loaded = false;
+let D = { parts: [], revisions: [], ncrs: [], captures: [], boards: [] }, lastJson = '', loaded = false;
 let sel = null, tab = 'revs', q = '', showAll = false, faiRev = null, form = null;
 
 async function refresh() {
   const txt = await (await fetch('/api/data')).text();
   if (txt === lastJson && loaded) return;
-  lastJson = txt; D = JSON.parse(txt); loaded = true; render();
+  lastJson = txt; D = Object.assign({ boards: [] }, JSON.parse(txt)); loaded = true; render();
 }
 
 const partById = id => D.parts.find(p => p.id === id);
@@ -120,14 +120,15 @@ function revText(r) {
     (r.params || []).map(x => x.name + ' ' + x.old + ' ' + x.new).join(' '),
     (r.bom || []).map(b => b.item + ' ' + b.note).join(' '),
     (r.tests || []).map(t => t.description + ' ' + t.notes).join(' '),
-    (r.files || []).map(f => f.name).join(' ')].join(' ').toLowerCase();
+    (r.files || []).map(f => f.name).join(' '), window.PCB ? PCB.revText(r) : ''].join(' ').toLowerCase();
 }
 function hitsFor(p) {
   if (!q) return { match: true, revs: [] };
   const pm = [p.name, p.partNo, p.project, p.material, p.notes, p.fusionDoc].join(' ').toLowerCase().includes(q);
   const revs = revsOf(p.id).filter(r => revText(r).includes(q)).map(r => r.id);
   const nm = ncrsOf(p.id).filter(n => [n.title, n.description, n.rootCause, n.action].join(' ').toLowerCase().includes(q)).length;
-  return { match: pm || revs.length > 0 || nm > 0, revs, nm };
+  const bm = p.type === 'pcb' && window.PCB ? PCB.boardHits(p.id, q) : 0;
+  return { match: pm || revs.length > 0 || nm > 0 || bm > 0, revs, nm };
 }
 
 /* ================= sidebar ================= */
@@ -151,7 +152,7 @@ function renderSide() {
     const hit = q && (h.revs.length || h.nm) ? `<span class="hit">${h.revs.length ? h.revs.length + ' rev' + (h.revs.length > 1 ? 's' : '') : ''}${h.revs.length && h.nm ? ', ' : ''}${h.nm ? h.nm + ' issue' + (h.nm > 1 ? 's' : '') : ''} match</span>` : '';
     return `<li><button type="button" class="pitem${p.id === sel ? ' on' : ''}" data-pid="${esc(p.id)}">
       <span class="nm">${esc(p.name)}</span>
-      <span class="rv">${open ? `<span class="badge" title="${open} open issue${open > 1 ? 's' : ''}">${open}</span>` : ''}${p.type === 'assembly' ? '<span class="chip asm">ASM</span>' : ''}${l ? `<span class="rev">${esc(l.rev)}</span>` : '<span class="hint">—</span>'}</span>
+      <span class="rv">${open ? `<span class="badge" title="${open} open issue${open > 1 ? 's' : ''}">${open}</span>` : ''}${p.type === 'assembly' ? '<span class="chip asm">ASM</span>' : p.type === 'pcb' ? '<span class="chip asm">PCB</span>' : ''}${l ? `<span class="rev">${esc(l.rev)}</span>` : '<span class="hint">—</span>'}</span>
       <span class="pn">${esc(p.partNo || 'No part no.')}${p.project ? ' · ' + esc(p.project) : ''}</span>${hit}</button></li>`;
   }).join('');
 }
@@ -172,13 +173,13 @@ function render() {
   }
   const rs = revsOf(p.id), last = rs[rs.length - 1], open = openNcrs(p.id);
   const upd = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-  const hasReleased = rs.some(isLocked);
+  const hasReleased = rs.some(isLocked), isPcb = p.type === 'pcb' && !!window.PCB;
   let h = `<div><button class="btn ghost sm back" type="button" data-act="back">← All parts</button></div>
   <section class="tblock">
     <div class="tb-head">
       <span class="rev big">${last ? esc(last.rev) : '–'}</span>
       <div class="t"><h2>${esc(p.name)}</h2>
-        <div class="meta">${p.type === 'assembly' ? '<span class="chip asm">Assembly</span>' : ''}
+        <div class="meta">${p.type === 'assembly' ? '<span class="chip asm">Assembly</span>' : p.type === 'pcb' ? '<span class="chip asm">PCB</span>' : ''}
           ${last ? `<span class="pill ${esc(last.status)}">${esc(STAT[last.status] || last.status)}</span>` : ''}
           ${open ? `<span class="pill Fail">${open} open issue${open > 1 ? 's' : ''}</span>` : ''}
           ${p.fusionDoc ? `<span class="chip">Fusion: ${esc(p.fusionDoc)}</span>` : ''}
@@ -199,15 +200,18 @@ function render() {
     ${p.notes ? `<div class="tb-notes">${esc(p.notes)}</div>` : ''}
   </section>
   <nav class="tabs" role="tablist">
-    ${tabBtn('revs', 'Revisions', rs.length)}${tabBtn('params', 'Parameters')}${tabBtn('fai', 'Inspection')}${tabBtn('issues', 'Issues', open || '')}
+    ${tabBtn('revs', 'Revisions', rs.length)}${isPcb ? tabBtn('bom', 'BOM') + tabBtn('fab', 'Fab & orders') + tabBtn('boards', 'Boards', D.boards.filter(b => b.partId === p.id).length || '') : tabBtn('params', 'Parameters') + tabBtn('fai', 'Inspection')}${tabBtn('issues', 'Issues', open || '')}
   </nav>`;
-  if (tab === 'params') h += paramHistory(rs);
+  if (isPcb ? ['params', 'fai'].includes(tab) : PCB_TABS.includes(tab)) tab = 'revs';
+  if (isPcb && PCB_TABS.includes(tab)) h += PCB.view(tab, p, rs);
+  else if (tab === 'params') h += paramHistory(rs);
   else if (tab === 'fai') h += faiView(p, rs);
   else if (tab === 'issues') h += issuesView(p);
   else h += revsView(p, rs);
   v.innerHTML = h;
 }
 const cell = (k, v) => `<div class="cell"><div class="k">${k}</div><div class="v">${esc(v || '—')}</div></div>`;
+const PCB_TABS = ['bom', 'fab', 'boards'];
 const tabBtn = (id, label, n) => `<button class="tab${tab === id ? ' on' : ''}" type="button" data-tab="${id}">${label}${n ? ` <span class="chip">${n}</span>` : ''}</button>`;
 
 function structure(p) {
@@ -259,6 +263,7 @@ function revCard(r) {
       <div class="rhead"><h3>${esc(r.title)}</h3>${locked ? '<span class="chip lock" title="Released revisions are locked. Verification and inspection results can still be added.">Locked</span>' : ''}<span class="pill ${esc(r.status)}">${esc(STAT[r.status] || r.status)}</span></div>
       <div class="meta"><span class="mono">${fmtDate(r.date)}</span>${r.fusionVer ? `<span class="chip">Fusion ${esc(r.fusionVer)}</span>` : ''}<span class="chip">Rev ${esc(r.rev)}</span>
         ${fs.total ? `<button class="chip${fs.Fail ? ' warn' : ''}" type="button" data-act="goto-fai" data-rid="${esc(r.id)}">FAI ${fs.Pass}/${fs.total} pass${fs.Fail ? ', ' + fs.Fail + ' fail' : ''}</button>` : ''}</div>
+      ${(partById(r.partId) || {}).type === 'pcb' && window.PCB ? PCB.revExtra(r) : ''}
       ${(r.what || r.why) ? `<div class="two"><div><div class="lbl">What changed</div><div class="prose">${esc(r.what || '—')}</div></div>
         <div><div class="lbl">Why</div><div class="prose">${esc(r.why || '—')}</div></div></div>` : ''}
       ${fixes.length || found.length ? `<div class="links">${fixes.map(n => `<button class="chip" type="button" data-act="goto-issues">Fixes: ${esc(n.title)}</button>`).join('')}${found.map(n => `<button class="chip${n.status !== 'Closed' ? ' warn' : ''}" type="button" data-act="goto-issues">Issue found: ${esc(n.title)}</button>`).join('')}</div>` : ''}
@@ -362,7 +367,7 @@ function partForm(p, preset) {
   openOv(panel(p.id ? 'Edit part' : 'New part', `<div class="grid">
       <div class="f s2"><label for="p-name">Name</label><input id="p-name" value="${esc(p.name)}" placeholder="Motor mount bracket" required></div>
       <div class="f"><label for="p-no">Part no. <span id="p-auto" class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">${form.autoNo ? '· auto' : ''}</span></label><input id="p-no" class="mono" value="${esc(p.partNo)}" placeholder="Fills from name"><button class="linkbtn" type="button" data-act="regen-no" style="align-self:flex-start;font-size:12px">Regenerate</button></div>
-      <div class="f"><label for="p-type">Type</label><select id="p-type"><option value="part"${p.type !== 'assembly' ? ' selected' : ''}>Part</option><option value="assembly"${p.type === 'assembly' ? ' selected' : ''}>Assembly</option></select></div>
+      <div class="f"><label for="p-type">Type</label><select id="p-type"><option value="part"${p.type !== 'assembly' ? ' selected' : ''}>Part</option><option value="assembly"${p.type === 'assembly' ? ' selected' : ''}>Assembly</option><option value="pcb"${p.type === 'pcb' ? ' selected' : ''}>PCB</option></select></div>
       <div class="f s2"><label for="p-proj">Project</label><input id="p-proj" value="${esc(p.project)}" placeholder="Project or programme"></div>
       <div class="f"><label for="p-mat">Material</label><input id="p-mat" value="${esc(p.material)}" placeholder="Al 6061-T6, PETG…"></div>
       <div class="f"><label for="p-units">Units</label><select id="p-units">${['mm', 'in', 'm'].map(u => `<option${(p.units || 'mm') === u ? ' selected' : ''}>${u}</option>`).join('')}</select></div>
@@ -447,12 +452,12 @@ function revForm(r, cap) {
       <div class="f s4"><label for="r-fixes">Fixes issue</label><select id="r-fixes"><option value="">None</option>${ncrsOf(sel).filter(n => n.status !== 'Closed' || n.fixedRevId === r.id).map(n => `<option value="${esc(n.id)}"${n.fixedRevId && n.fixedRevId === r.id ? ' selected' : ''}>${esc(n.title)}</option>`).join('')}</select></div>
     </div>
     <div class="notice warn" id="rel-note" hidden>Saving as Released locks this revision. Only verification and inspection results can be added afterwards.</div>
-    <div class="sec"><div class="sec-h"><div class="lbl">Parameters</div><span>
+    <div class="sec" id="sec-params"${p.type === 'pcb' ? ' hidden' : ''}><div class="sec-h"><div class="lbl">Parameters</div><span>
       ${last && !editing ? '<button class="linkbtn" type="button" data-act="pull-params">Pull from Rev ' + esc(last.rev) + '</button> · ' : ''}
       <button class="linkbtn" type="button" data-act="add-param">+ Add row</button></span></div><div class="rows" id="prows"></div></div>
-    <div class="sec"><div class="sec-h"><div class="lbl">BOM changes</div><button class="linkbtn" type="button" data-act="add-bom">+ Add row</button></div><div class="rows" id="brows"></div></div>
+    <div class="sec"${p.type === 'pcb' ? ' hidden' : ''}><div class="sec-h"><div class="lbl">BOM changes</div><button class="linkbtn" type="button" data-act="add-bom">+ Add row</button></div><div class="rows" id="brows"></div></div>
     <div class="sec"><div class="sec-h"><div class="lbl">Files</div><label class="linkbtn" for="r-files" style="cursor:pointer">+ Attach files</label><input id="r-files" type="file" multiple hidden></div>
-      <span class="hint">STEP, F3D, STL, drawings (PDF), slicer or CAM files: whatever captures this revision.</span><div class="rows" id="frows"></div></div>
+      <span class="hint">${p.type === 'pcb' ? 'KiCad project zip, Gerber/drill zip, pick-and-place, schematic PDF.' : 'STEP, F3D, STL, drawings (PDF), slicer or CAM files: whatever captures this revision.'}</span><div class="rows" id="frows"></div></div>
     ${testsSec}
     <div class="sec"><div class="sec-h"><div class="lbl">Images</div><label class="linkbtn" for="r-imgs" style="cursor:pointer">+ Add screenshots</label><input id="r-imgs" type="file" accept="image/*" multiple hidden></div>
       <span class="hint">Paste a screenshot (Ctrl/Cmd+V) or pick files.</span><div class="rows" id="irows"></div></div>`,
@@ -553,7 +558,11 @@ async function saveRev() {
       images, files, tests, updatedAt: Date.now() };
     let id = form.id;
     if (id) await api.patch('revisions', id, body);
-    else { id = newId(); body.createdAt = Date.now(); await api.put('revisions', id, body); }
+    else {
+      id = newId(); body.createdAt = Date.now();
+      if ((partById(sel) || {}).type === 'pcb' && window.PCB) Object.assign(body, PCB.newRevDefaults(revsOf(sel).slice(-1)[0]));
+      await api.put('revisions', id, body);
+    }
     const fixes = $('#r-fixes').value;
     for (const n of ncrsOf(sel)) {
       if (n.id === fixes && n.fixedRevId !== id) await api.patch('ncrs', n.id, { fixedRevId: id, status: 'Closed', updatedAt: Date.now() });
@@ -677,6 +686,7 @@ function changelog(p) {
     const ts = (r.tests || []).filter(t => t.description);
     if (ts.length) s += `\n| Verification | Check | Result | Notes |\n|---|---|---|---|\n` + ts.map(t => `| ${t.method} | ${t.description} | ${t.result} | ${t.notes || ''} |`).join('\n') + '\n';
     const fs = faiSummary(r.fai); if (fs.total) s += `\nFirst-article inspection: ${fs.Pass}/${fs.total} pass${fs.Fail ? ', ' + fs.Fail + ' fail' : ''}\n`;
+    if ((partById(r.partId) || {}).type === 'pcb' && window.PCB) s += PCB.changelog(r);
     if ((r.files || []).length) s += `\nFiles: ${r.files.map(f => f.name).join(', ')}\n`;
   });
   return s;
@@ -739,11 +749,12 @@ document.addEventListener('click', async e => {
       if (l === 'files' && x.id) form.removedFiles.push(x.id);
       if (l === 'tests' && x.file) form.removedFiles.push(x.file.id);
       form[l].splice(i, 1);
-      if (l === 'components') drawComps(); else if (l === 'items') drawFai(); else drawRows();
+      if (form.redraw) form.redraw(); else if (l === 'components') drawComps(); else if (l === 'items') drawFai(); else drawRows();
       break;
     }
     case 'rm-tfile': { const tt = form.tests[+a.dataset.i]; if (tt.file) form.removedFiles.push(tt.file.id); tt.file = null; tt.pending = null; drawRows(); break; }
-    case 'del-rev': arm(a, 'Confirm delete', async () => {
+    case 'del-rev': if (D.boards.some(b => b.revId === a.dataset.rid)) { flash(a, 'Has boards built'); break; }
+      arm(a, 'Confirm delete', async () => {
       const r = revById(a.dataset.rid);
       try {
         await api.del('revisions', r.id);
@@ -766,6 +777,7 @@ document.addEventListener('click', async e => {
             for (const t of r.tests || []) if (t.file) await api.delFile(t.file.id);
           }
           for (const nc of ncrsOf(p.id)) await api.del('ncrs', nc.id);
+          for (const bd of D.boards.filter(b => b.partId === p.id)) await api.del('boards', bd.id);
           for (const asm of usedIn(p.id)) await api.patch('parts', asm.id, { components: asm.components.filter(c => c.partId !== p.id) });
           await api.del('parts', p.id); sel = null; await refresh();
         } catch (err) { flash(a, 'Couldn’t delete'); }
@@ -782,6 +794,7 @@ document.addEventListener('click', async e => {
       }
       break;
     }
+    default: if (window.PCB) PCB.onClick(act, a);
   }
 });
 document.addEventListener('keydown', e => {
@@ -801,6 +814,7 @@ document.addEventListener('input', e => {
     if (el.id === 'p-no') { form.autoNo = false; $('#p-auto').textContent = ''; return; }
     if (el.id === 'p-name' || el.id === 'p-proj') { fillNo(); return; }
   }
+  if (window.PCB && PCB.onInput(el)) return;
   rowInput(el);
 });
 document.addEventListener('change', e => {
@@ -811,18 +825,26 @@ document.addEventListener('change', e => {
   if (el.id === 'r-imgs') { addImages(el.files); el.value = ''; return; }
   if (el.id === 'r-files') { addFiles(el.files); el.value = ''; return; }
   if (el.dataset.tfile != null && el.files[0]) { form.tests[+el.dataset.tfile].pending = el.files[0]; drawRows(); return; }
+  if (window.PCB && PCB.onChange(el)) return;
   if (el.id === 'q-copy' && el.value) { const src = revById(el.value); form.items = src.fai.items.map(x => ({ ...x, meas: '' })); el.value = ''; drawFai(); return; }
   rowInput(el);
 });
 document.addEventListener('submit', e => {
   e.preventDefault();
-  ({ pform: savePart, rform: saveRev, qform: saveFai, nform: saveNcr, cform: continueCapture }[e.target.id] || (() => {}))();
+  ({ pform: savePart, rform: saveRev, qform: saveFai, nform: saveNcr, cform: continueCapture }[e.target.id] || (window.PCB && PCB.submit[e.target.id]) || (() => {}))();
 });
 document.addEventListener('paste', e => {
   if (!form || form.kind !== 'rev' || form.mode !== 'full') return;
   const fs = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => f.type.startsWith('image/'));
   if (fs.length) { e.preventDefault(); addImages(fs); }
 });
+
+/* ================= shared with pcb.js ================= */
+window.CADLog = {
+  get D() { return D; }, get sel() { return sel; }, get form() { return form; }, set form(v) { form = v; },
+  setTab: t => { tab = t; }, api, esc, today, newId, fmtSize, fileUrl, partById, revById, revsOf, latest, isLocked,
+  refresh, render, openOv, closeOv, setErr, panel, busy, unbusy, arm, flash,
+};
 
 /* ================= boot ================= */
 render();

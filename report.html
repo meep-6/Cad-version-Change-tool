@@ -67,6 +67,15 @@ function faiResult(it){const m=String(it.meas||'').trim();if(!m)return 'Pending'
   if(['ok','pass','yes','go'].includes(ml))return 'Pass';if(['nok','fail','no','no-go','nogo'].includes(ml))return 'Fail';
   const nom=parseFloat(it.nom),v=parseFloat(m);if(isNaN(nom)||isNaN(v))return 'Pending';
   const lo=nom-Math.abs(parseFloat(it.tm)||0),hi=nom+Math.abs(parseFloat(it.tp)||0);return(v>=lo-1e-9&&v<=hi+1e-9)?'Pass':'Fail'}
+const FAB=[['layers','Layers'],['thickness','Thickness'],['size','Size'],['copper','Copper'],['finish','Finish'],['mask','Mask/silk'],['track','Track/space'],['drill','Drill'],['impedance','Impedance'],['assembly','Assembly']];
+function pcbSection(r){
+  let h='';const bom=r.pcbBom||[],costs=r.bomCosts||{},fab=r.fab||{},ords=r.orders||[];
+  if(bom.length){let placed=0,cost=0,priced=0;bom.forEach(l=>{if(l.dnp)return;placed+=l.qty;const c=parseFloat(costs[[l.value,l.footprint,l.mpn].join('|')]??l.cost);if(!isNaN(c)){cost+=c*l.qty;priced++}});
+    h+=`<div class="lbl">BOM · ${bom.length} lines · ${placed} parts${priced?' · '+cost.toFixed(2)+' per board':''}</div>`+table(['Refs','Qty','Value','Footprint','MPN'],bom.map(l=>`<tr${l.dnp?' style="color:#888"':''}><td class="num" style="white-space:normal">${esc(l.refs.join(', '))}</td><td class="num">${l.qty}</td><td>${esc(l.value)}${l.dnp?' (DNP)':''}</td><td>${esc(String(l.footprint||'').split(':').pop())}</td><td class="num">${esc(l.mpn)}</td></tr>`));}
+  const ff=FAB.filter(([k])=>fab[k]);if(ff.length)h+=`<div class="lbl">Fab spec</div><div>${ff.map(([k,l])=>`${l}: <strong>${esc(fab[k])}</strong>`).join(' · ')}</div>`;
+  if(ords.length)h+=`<div class="lbl">Orders</div>`+table(['Fab','Order no.','Date','Qty','Cost','Status'],ords.map(o=>`<tr><td>${esc(o.fab)}</td><td class="num">${esc(o.orderNo)}</td><td class="num">${esc(o.date)}</td><td class="num">${esc(o.qty)}</td><td class="num">${esc(o.cost)}</td><td>${esc(o.status)}</td></tr>`));
+  return h;
+}
 const cell=(k,v)=>`<div class="cell"><div class="k">${k}</div><div class="v">${esc(v||'—')}</div></div>`;
 const table=(heads,rows)=>rows.length?`<table><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`:'';
 
@@ -80,7 +89,7 @@ fetch('/api/data').then(r=>r.json()).then(D=>{
   const revOf=id=>{const r=D.revisions.find(x=>x.id===id);return r?'Rev '+r.rev:'—'};
   const latestRev=id=>{const x=D.revisions.filter(r=>r.partId===id).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));return x[x.length-1]};
   document.title=(p.partNo?p.partNo+' ':'')+p.name+' — Design Report';
-  let h=`<h1>${esc(p.name)}</h1><div class="meta">Design record${p.type==='assembly'?' · Assembly':''} · generated ${new Date().toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</div>
+  let h=`<h1>${esc(p.name)}</h1><div class="meta">Design record${p.type==='assembly'?' · Assembly':p.type==='pcb'?' · PCB':''} · generated ${new Date().toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</div>
   <div class="tb"><div class="tb-top"><span class="rev big">${last?esc(last.rev):'–'}</span><div><div class="k">Current revision</div>${last?`<strong>${esc(last.title)}</strong> <span class="pill ${esc(last.status)}">${esc(STAT[last.status]||last.status)}</span>`:'No revisions'}</div></div>
   <div class="grid">${cell('Part no.',p.partNo)}${cell('Project',p.project)}${cell('Material',p.material)}${cell('Units',p.units||'mm')}
   ${cell('Fusion design',p.fusionDoc)}${cell('Revisions',String(rs.length))}${cell('Open issues',String(ncrs.filter(n=>n.status!=='Closed').length))}${cell('Last update',last?last.date:'')}</div></div>`;
@@ -106,11 +115,17 @@ fetch('/api/data').then(r=>r.json()).then(D=>{
       ${ts.length?'<div class="lbl">Verification</div>'+table(['Method','Check','Result','Notes','Data'],ts.map(t=>`<tr><td>${esc(t.method)}</td><td>${esc(t.description)}</td><td><span class="pill ${esc(t.result)}">${esc(t.result)}</span></td><td>${esc(t.notes)}</td><td>${t.file?esc(t.file.name):''}</td></tr>`)):''}
       ${items.length?`<div class="lbl">First-article inspection${r.fai.serial?' · S/N '+esc(r.fai.serial):''}${r.fai.date?' · '+fmtDate(r.fai.date):''}${r.fai.inspector?' · '+esc(r.fai.inspector):''}</div>`+table(['#','Characteristic','Nominal','Tol','Measured','Result'],items.map(it=>{const res=faiResult(it);
         return `<tr><td class="num">${esc(it.n)}</td><td>${esc(it.char)}</td><td class="num">${esc(it.nom)} ${esc(it.unit)}</td><td class="num">−${esc(String(it.tm||0).replace(/^-/,''))} / +${esc(String(it.tp||0).replace(/^\+/,''))}</td><td class="num">${esc(it.meas)}</td><td><span class="pill ${res}">${res}</span></td></tr>`})):''}
+      ${pcbSection(r)}
       ${(r.files||[]).length?`<div class="lbl">Files</div><div class="mono">${r.files.map(f=>esc(f.name)).join(' · ')}</div>`:''}
       ${(r.images||[]).length?`<div class="imgs">${r.images.slice(0,6).map(im=>`<figure><img src="${esc(im.url)}" alt=""><figcaption><strong>${esc(im.tag)}</strong> ${esc(im.caption)}</figcaption></figure>`).join('')}</div>`:''}
     </section>`;
   });
 
+  const boards=(D.boards||[]).filter(b=>b.partId===p.id).sort((a,b)=>String(a.serial).localeCompare(String(b.serial),undefined,{numeric:true}));
+  if(boards.length){
+    h+=`<h2>Boards</h2>`+table(['Serial','Rev','Status','Bring-up','Reworks','Built','Installed in'],boards.map(b=>{const res=(b.results||[]).filter(x=>x.result!=='Skip'),pass=res.filter(x=>x.result==='Pass').length,fail=res.filter(x=>x.result==='Fail').length;
+      return `<tr><td class="num">${esc(b.serial)}</td><td class="num">${esc(revOf(b.revId).replace('Rev ',''))}</td><td>${esc(b.status)}</td><td class="num">${res.length?pass+'/'+res.length+(fail?' ('+fail+' fail)':''):'—'}</td><td>${(b.reworks||[]).map(x=>esc(x.description)).join('; ')}</td><td class="num">${esc(b.date)}</td><td>${esc(b.location)}</td></tr>`}));
+  }
   if(ncrs.length){
     h+=`<h2>Issues</h2>`+table(['Date','Issue','Found','Root cause','Action','Fixed','Status'],ncrs.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).map(n=>
       `<tr><td class="num">${esc(n.date)}</td><td>${esc(n.title)}</td><td class="num">${esc(revOf(n.revId))}</td><td>${esc(n.rootCause)}</td><td>${esc(n.action)}</td><td class="num">${n.fixedRevId?esc(revOf(n.fixedRevId)):'—'}</td><td><span class="pill ${esc(n.status)}">${esc(n.status)}</span></td></tr>`));

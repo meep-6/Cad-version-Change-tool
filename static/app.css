@@ -200,3 +200,9 @@ textarea.out{width:100%;min-height:260px;font-family:var(--f-mono);font-size:12p
   .rcard .gut{display:none}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* PCB module */
+.lrow{display:grid;grid-template-columns:1.4fr 1fr 1.3fr 1.1fr 1fr 1fr 74px 30px;gap:6px}
+.brrow{display:grid;grid-template-columns:minmax(0,1.6fr) 100px 1fr 1.2fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+ul.dl{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:13px}
+@media (max-width:860px){.lrow{grid-template-columns:1fr 1fr 30px}.brrow{grid-template-columns:1fr 1fr}}
